@@ -3,26 +3,33 @@
  "players": {
   "Ich": {
    "ingame": "kbb[AH]",
-   "self": true
+   "self": true,
+   "avatar": "https://avatars.fastly.steamstatic.com/b908832f419a8716df3acf94dc358924e6728bd8_full.jpg"
   },
   "Max": {
-   "ingame": "Diktator Mbappe"
+   "ingame": "Diktator Mbappe",
+   "avatar": "https://avatars.fastly.steamstatic.com/5ef0a9a0dc4caba12b77968587dfd0037589b310_full.jpg"
   },
   "Henry": {
-   "ingame": "Jakob Schwarz"
+   "ingame": "Jakob Schwarz",
+   "avatar": "https://avatars.fastly.steamstatic.com/d336e80d0535ba865049fc82b1aeb418f27bff23_full.jpg"
   },
   "Florian": {
-   "ingame": "spUUkz"
+   "ingame": "spUUkz",
+   "avatar": "https://avatars.fastly.steamstatic.com/33941b9aa18816353dbf6724f054be7d9e82bfce_full.jpg"
   },
   "Robin": {
-   "ingame": "Jaray4r"
+   "ingame": "Jaray4r",
+   "avatar": "https://avatars.fastly.steamstatic.com/b7fbf78e6d2abb73de19ff818cf221d1264cca7f_full.jpg"
   },
   "Sencesless": {
-   "ingame": "Sencesless"
+   "ingame": "Sencesless",
+   "avatar": "https://avatars.fastly.steamstatic.com/22f2f8047df75bfbd3a00cdff4d40085782a3666_full.jpg"
   },
   "Lauser (BOT)": {
    "ingame": "Lauser",
-   "note": "Nickname ist selbstironisch gemeint, echter Spieler"
+   "note": "Nickname ist selbstironisch gemeint, echter Spieler",
+   "avatar": "https://avatars.fastly.steamstatic.com/c4daaca4d06a39936543e00e03a7f7cbea321f95_full.jpg"
   }
  },
  "matches": [
@@ -1624,6 +1631,289 @@
      1
     ]
    }
+  },
+  {
+   "date": "2026-09-14",
+   "map": "Dämmerung",
+   "type": "offiziell",
+   "shot": "daemmerung",
+   "par": [
+    2,
+    2,
+    2,
+    3,
+    3,
+    3,
+    3,
+    4,
+    3,
+    3,
+    4,
+    2,
+    3,
+    3,
+    4,
+    3,
+    3,
+    3
+   ],
+   "scores": {
+    "Florian": [
+     3,
+     3,
+     2,
+     1,
+     2,
+     3,
+     2,
+     3,
+     3,
+     4,
+     5,
+     2,
+     5,
+     3,
+     7,
+     3,
+     4,
+     4
+    ],
+    "Ich": [
+     3,
+     2,
+     2,
+     1,
+     2,
+     2,
+     3,
+     1,
+     4,
+     9,
+     5,
+     2,
+     3,
+     4,
+     6,
+     3,
+     4,
+     6
+    ]
+   }
+  },
+  {
+   "date": "2026-09-14",
+   "map": "The Escapists",
+   "type": "offiziell",
+   "shot": "the-escapists",
+   "par": [
+    2,
+    2,
+    3,
+    2,
+    4,
+    4,
+    3,
+    4,
+    4,
+    5,
+    4,
+    4,
+    4,
+    3,
+    4,
+    4,
+    4,
+    6
+   ],
+   "scores": {
+    "Florian": [
+     1,
+     2,
+     3,
+     3,
+     6,
+     3,
+     3,
+     3,
+     4,
+     4,
+     3,
+     3,
+     4,
+     3,
+     4,
+     3,
+     6,
+     8
+    ],
+    "Ich": [
+     2,
+     2,
+     3,
+     3,
+     4,
+     4,
+     3,
+     4,
+     4,
+     7,
+     3,
+     5,
+     3,
+     3,
+     6,
+     2,
+     3,
+     7
+    ]
+   }
+  },
+  {
+   "date": "2026-09-14",
+   "map": "Hüpfburg",
+   "type": "offiziell",
+   "shot": "huepfburg-2",
+   "par": [
+    2,
+    2,
+    2,
+    4,
+    5,
+    2,
+    3,
+    3,
+    2,
+    3,
+    4,
+    4,
+    5,
+    2,
+    5,
+    5,
+    5,
+    2
+   ],
+   "scores": {
+    "Florian": [
+     3,
+     2,
+     2,
+     5,
+     5,
+     2,
+     3,
+     2,
+     2,
+     4,
+     4,
+     4,
+     5,
+     3,
+     6,
+     3,
+     3,
+     3
+    ],
+    "Ich": [
+     2,
+     2,
+     2,
+     6,
+     5,
+     2,
+     3,
+     1,
+     1,
+     4,
+     4,
+     6,
+     6,
+     4,
+     7,
+     4,
+     7,
+     2
+    ]
+   }
+  },
+  {
+   "date": "2026-09-14",
+   "map": "Wald",
+   "type": "offiziell",
+   "shot": "wald",
+   "par": [
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    3,
+    2,
+    3,
+    2,
+    4,
+    3,
+    5,
+    5,
+    3,
+    3,
+    3
+   ],
+   "scores": {
+    "Ich": [
+     3,
+     1,
+     3,
+     1,
+     2,
+     3,
+     2,
+     3,
+     1,
+     4,
+     2,
+     3,
+     2,
+     4,
+     3,
+     3,
+     3,
+     3
+    ],
+    "Florian": [
+     2,
+     1,
+     3,
+     1,
+     1,
+     3,
+     2,
+     3,
+     1,
+     3,
+     3,
+     3,
+     2,
+     4,
+     3,
+     4,
+     3,
+     5
+    ]
+   }
+  },
+  {
+   "date": "2026-09-14",
+   "map": "Vernübelter Grenzer",
+   "type": "community",
+   "totals": {
+    "Max": 109,
+    "Ich": 117,
+    "Florian": 133
+   },
+   "note": "Kein Screenshot, nur Endstände notiert."
   }
  ],
  "maps": {

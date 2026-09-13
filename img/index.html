@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minigolf-Buch — Golf With Your Friends</title>
+<style>
+  :root {
+    --green-deep:#103026; --green-mid:#1B4636; --green-line:#2C5C48;
+    --chalk:#EDF1E8; --chalk-dim:#A9BBAE; --amber:#E3A33C; --brick:#B4544A; --fairway:#5FA36B;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; font-family:"Inter","Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-variant-numeric:tabular-nums; background:var(--green-deep); color:var(--chalk); line-height:1.45;
+  }
+  .wrap { max-width:1000px; margin:0 auto; padding:22px 16px 70px; }
+  h1 { font-size:26px; font-weight:600; letter-spacing:-.02em; margin:0 0 2px; }
+  .sub { color:var(--chalk-dim); font-size:13px; margin:0 0 20px; }
+  h2 { font-size:17px; font-weight:600; margin:26px 0 10px; }
+  h3 { font-size:14px; font-weight:600; margin:18px 0 6px; }
+  nav { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:18px; }
+  nav button {
+    background:transparent; color:var(--chalk-dim); border:1px solid var(--green-line);
+    border-radius:2px; padding:7px 12px; font-size:13px; cursor:pointer; font-family:inherit;
+  }
+  nav button:hover { color:var(--chalk); }
+  nav button[aria-current="true"] { background:var(--green-mid); color:var(--chalk); border-color:var(--fairway); }
+  nav button:focus-visible, .maprow:focus-visible, .back:focus-visible, .maplink:focus-visible { outline:2px solid var(--amber); outline-offset:1px; }
+  .scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0 -16px; padding:0 16px; }
+  table { border-collapse:collapse; font-size:13px; width:100%; }
+  th,td { padding:6px 8px; text-align:right; border-bottom:1px solid var(--green-line); white-space:nowrap; }
+  th { color:var(--chalk-dim); font-weight:500; font-size:12px; }
+  th:first-child, td:first-child { text-align:left; }
+  tr.me td { color:var(--amber); }
+  .win { color:var(--fairway); } .loss { color:var(--brick); } .muted { color:var(--chalk-dim); }
+  caption { text-align:left; font-size:13px; color:var(--chalk-dim); padding-bottom:6px; }
+  .matrix td,.matrix th { text-align:center; }
+  .matrix th:first-child { text-align:left; }
+  .matrix td.self { background:var(--green-mid); color:var(--chalk-dim); }
+  a { color:var(--fairway); } a:hover { color:var(--chalk); }
+  .maprow {
+    display:flex; justify-content:space-between; align-items:baseline; gap:10px; width:100%;
+    text-align:left; background:transparent; color:var(--chalk); border:0;
+    border-bottom:1px solid var(--green-line); padding:11px 2px; font-family:inherit; font-size:15px; cursor:pointer;
+  }
+  .maprow:hover { background:var(--green-mid); }
+  .maprow .meta { font-size:12px; color:var(--chalk-dim); white-space:nowrap; }
+  .maprow .name { font-weight:500; }
+  .unplayed .name { color:var(--chalk-dim); }
+  .maplink { background:transparent; border:0; padding:0; font-family:inherit; font-size:13px;
+    color:var(--fairway); cursor:pointer; text-align:left; }
+  .maplink:hover { color:var(--chalk); text-decoration:underline; }
+  .note,.hint { font-size:12px; color:var(--chalk-dim); margin-top:4px; }
+  .empty { color:var(--chalk-dim); font-size:13px; padding:16px 0; }
+  .grade { font-size:12px; color:var(--chalk-dim); }
+  .back { background:transparent; border:0; color:var(--chalk-dim); font-family:inherit; font-size:13px; cursor:pointer; padding:0 0 10px; }
+  .back:hover { color:var(--chalk); }
+  .avatar { width:22px; height:22px; border-radius:50%; vertical-align:-5px; margin-right:7px; border:1px solid var(--green-line); }
+  figure { margin:12px 0 0; }
+  figure img { width:100%; height:auto; border:1px solid var(--green-line); border-radius:3px; display:block; }
+  figcaption { font-size:12px; color:var(--chalk-dim); margin-top:5px; }
+  .ro { display:inline-block; font-size:11px; color:var(--chalk-dim); border:1px solid var(--green-line);
+    border-radius:2px; padding:2px 7px; margin-left:8px; vertical-align:middle; }
+  .err { border:1px solid var(--brick); border-radius:3px; padding:12px 14px; color:var(--chalk); font-size:13px; }
+</style>
+</head>
+<body>
+<div class="wrap"><div id="root"><p class="muted">Lade Daten…</p></div></div>
+
+<script>
+let DATA = null, MATCHES = [], MAPS = {}, PLAYERS = {};
+let ME = 'Ich';
+let tab = 'matches', openMap = null;
+
+const sum = a => a.reduce((x,y)=>x+y,0);
+const totalOf = (m,p) => (m.scores && m.scores[p]) ? sum(m.scores[p]) : ((m.totals && m.totals[p] != null) ? m.totals[p] : null);
+const playersOf = m => {
+  const s = new Set(Object.keys(m.scores || m.totals || {}));
+  (m.order || []).forEach(g => g.forEach(p => s.add(p)));
+  return [...s];
+};
+const parTotal = m => m.par ? sum(m.par) : (m.parTotal != null ? m.parTotal : null);
+const fmt = (n,d=2) => (n>=0?'+':'') + n.toFixed(d);
+const fmtInt = n => (n>0?'+':n<0?'':'±') + n;
+const esc = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+const isBot = p => !!(PLAYERS[p] && PLAYERS[p].bot);
+
+function rankOf(m,p) {
+  if (!m.order) return null;
+  const i = m.order.findIndex(g => g.includes(p));
+  return i < 0 ? null : i;
+}
+function winnerOf(m) {
+  if (m.winner) return m.winner;
+  if (m.order && m.order[0].length === 1) return m.order[0][0];
+  const sc = playersOf(m).map(p => [p, totalOf(m,p)]).filter(x => x[1] != null);
+  if (!sc.length) return null;
+  const best = Math.min(...sc.map(x => x[1]));
+  const w = sc.filter(x => x[1] === best);
+  return w.length === 1 ? w[0][0] : null;
+}
+function placeOf(m,p) {
+  const ps = playersOf(m);
+  if (!ps.includes(p)) return null;
+  const vals = ps.map(x => [x, totalOf(m,x)]).filter(x => x[1] != null);
+  if (vals.length === ps.length) {
+    const t = totalOf(m,p);
+    return vals.filter(x => x[1] < t).length + 1;
+  }
+  const r = rankOf(m,p);
+  if (r != null) { let pl = 1; for (let i = 0; i < r; i++) pl += m.order[i].length; return pl; }
+  if (m.winner && ps.length === 2) return m.winner === p ? 1 : 2;
+  return null;
+}
+function holeStats(m,p) {
+  if (!m.scores || !m.scores[p] || !m.par) return null;
+  const d = m.scores[p].map((s,i) => s - m.par[i]);
+  const mean = sum(d)/d.length;
+  const sd = Math.sqrt(sum(d.map(x => (x-mean)**2))/d.length);
+  const worst = Math.max(...d);
+  return { toPar:sum(d), mean, sd, underOrPar:d.filter(x=>x<=0).length, worst, worstHole:d.indexOf(worst)+1, holes:d.length };
+}
+// Gegnerbereinigte Stärke (Bradley-Terry, Minorization-Maximization).
+// Ein Sieg gegen einen starken Gegner zählt mehr als einer gegen einen schwachen,
+// dadurch verzerrt es nicht, wenn jemand fast immer gegen den Besten spielt.
+let RATING = null;
+function pairPlace(m,p,a,b) {
+  const ta = totalOf(m,a), tb = totalOf(m,b);
+  if (ta != null && tb != null) return ta === tb ? null : (p === a ? (ta < tb ? 1 : 2) : (tb < ta ? 1 : 2));
+  const ra = rankOf(m,a), rb = rankOf(m,b);
+  if (ra != null && rb != null) return ra === rb ? null : (p === a ? (ra < rb ? 1 : 2) : (rb < ra ? 1 : 2));
+  if (m.winner === a || m.winner === b) return m.winner === p ? 1 : 2;
+  return null;
+}
+function computeRating() {
+  const ps = [...new Set(MATCHES.flatMap(playersOf))];
+  const W = {}; ps.forEach(p => W[p] = {});
+  MATCHES.forEach(m => {
+    const f = playersOf(m);
+    for (let i = 0; i < f.length; i++) for (let j = i+1; j < f.length; j++) {
+      const a = f[i], b = f[j], pa = pairPlace(m,a,a,b);
+      if (pa == null) continue;
+      const w = pa === 1 ? a : b, l = pa === 1 ? b : a;
+      W[w][l] = (W[w][l]||0) + 1;
+      if (W[l][w] == null) W[l][w] = 0;
+    }
+  });
+  let S = {}; ps.forEach(p => S[p] = 1);
+  for (let it = 0; it < 400; it++) {
+    const next = {};
+    ps.forEach(p => {
+      const wins = sum(Object.values(W[p])) + 0.5;     // halber virtueller Sieg als Dämpfung
+      let den = 0.5 / (S[p] + 1);
+      Object.keys(W[p]).forEach(q => {
+        const n = (W[p][q]||0) + (W[q][p]||0);
+        if (n) den += n / (S[p] + S[q]);
+      });
+      next[p] = den > 0 ? wins/den : S[p];
+    });
+    const g = Math.exp(sum(ps.map(p => Math.log(next[p])))/ps.length);
+    ps.forEach(p => S[p] = next[p]/g);
+  }
+  RATING = S;
+}
+const ratingOf = p => (RATING && RATING[p] != null) ? RATING[p] : 0;
+function roundCount(p) { return MATCHES.filter(m => playersOf(m).includes(p)).length; }
+function allPlayers() {
+  const s = new Set();
+  MATCHES.forEach(m => playersOf(m).forEach(p => s.add(p)));
+  Object.values(MAPS).forEach(x => Object.keys(x.grades||{}).forEach(p => s.add(p)));
+  return [...s].sort((a,b) => {
+    if (a === ME) return -1;          // eigener Eintrag immer zuerst
+    if (b === ME) return 1;
+    const d = ratingOf(b) - ratingOf(a);
+    if (Math.abs(d) > 1e-9) return d;
+    return roundCount(b) - roundCount(a);
+  });
+}
+function duel(a,b) {
+  let aw=0, bw=0, played=0, diff=0, diffN=0;
+  MATCHES.forEach(m => {
+    const ps = playersOf(m);
+    if (!ps.includes(a) || !ps.includes(b)) return;
+    played++;
+    const ta = totalOf(m,a), tb = totalOf(m,b);
+    if (ta != null && tb != null) {
+      diff += ta - tb; diffN++;
+      if (ta < tb) aw++; else if (tb < ta) bw++;
+      return;
+    }
+    const ra = rankOf(m,a), rb = rankOf(m,b);
+    if (ra != null && rb != null) { if (ra < rb) aw++; else if (rb < ra) bw++; return; }
+    if (m.winner === a) aw++; else if (m.winner === b) bw++;
+  });
+  return { played, aw, bw, avgDiff: diffN ? diff/diffN : null };
+}
+function mapNames() {
+  const s = new Set(Object.keys(MAPS));
+  MATCHES.forEach(m => s.add(m.map));
+  return [...s].sort((a,b) => a.localeCompare(b,'de'));
+}
+const roundsOf = n => MATCHES.filter(m => m.map === n);
+const mapInfo = n => MAPS[n] || {};
+
+/* ---------- Runden ---------- */
+function viewMatches() {
+  const rows = MATCHES.map(m => {
+    const w = winnerOf(m), pt = parTotal(m);
+    const cells = playersOf(m).map(p => {
+      const t = totalOf(m,p);
+      return '<span class="' + (p===w?'win':'') + '">' + esc(p) + ' ' + (t==null?'–':t) + '</span>';
+    }).join(' · ');
+    const short = m.note ? (m.note.length > 46 ? m.note.slice(0,44) + '…' : m.note) : '';
+    return '<tr><td><button class="maplink" data-map="' + esc(m.map) + '">' + esc(m.map) + '</button>' +
+      (short ? '<div class="note">' + esc(short) + '</div>' : '') + '</td>' +
+      '<td class="muted">' + m.date + '</td>' +
+      '<td class="muted">' + (pt==null?'–':pt) + '</td>' +
+      '<td style="text-align:left">' + cells + '</td>' +
+      '<td>' + (w ? '<span class="win">'+esc(w)+'</span>' : '<span class="muted">offen</span>') + '</td></tr>';
+  }).join('');
+  return '<h2>Runden</h2><div class="scroll"><table><thead><tr><th>Map</th><th>Datum</th><th>Par</th><th>Ergebnisse</th><th>Sieger</th></tr></thead><tbody>'+rows+'</tbody></table></div>' +
+    '<p class="note">Auf den Map-Namen tippen für Screenshot, Loch-für-Loch-Karte und die vollständige Notiz.</p>';
+}
+
+/* ---------- Duelle ---------- */
+function viewDuels() {
+  const ps = allPlayers().filter(p => MATCHES.some(m => playersOf(m).includes(p)));
+  const head = ps.map(p => '<th>'+esc(p)+'</th>').join('');
+  const body = ps.map(a => '<tr'+(a===ME?' class="me"':'')+'><th style="text-align:left">'+esc(a)+'</th>' +
+    ps.map(b => {
+      if (a === b) return '<td class="self">—</td>';
+      const d = duel(a,b);
+      if (!d.played) return '<td class="muted">·</td>';
+      return '<td class="'+(d.aw>d.bw?'win':d.bw>d.aw?'loss':'')+'">'+d.aw+':'+d.bw+'</td>';
+    }).join('') + '</tr>').join('');
+  const mine = ps.filter(p => p !== ME).map(p => {
+    const d = duel(ME,p);
+    if (!d.played) return '';
+    return '<tr><td>'+esc(p)+'</td><td>'+d.played+'</td><td class="'+(d.aw>d.bw?'win':d.aw<d.bw?'loss':'')+'">'+d.aw+':'+d.bw+'</td><td>'+(d.avgDiff==null?'–':fmt(d.avgDiff,1))+'</td></tr>';
+  }).join('');
+  return '<h2>Duellmatrix</h2><div class="scroll"><table class="matrix"><caption>Zeile gegen Spalte, gelesen als Siege der Zeile zu Siegen der Spalte. Sortiert nach gegnerbereinigter Stärke, Bester oben. Bots bleiben unberücksichtigt.</caption><thead><tr><th></th>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>' +
+    '<h2>Bilanz von kbb[AH]</h2><div class="scroll"><table><thead><tr><th>Gegner</th><th>Runden</th><th>Siege</th><th>Ø Schlagdifferenz</th></tr></thead><tbody>'+mine+'</tbody></table></div>' +
+    '<p class="note">Negative Differenz heißt weniger Schläge im Schnitt. Runden ohne notierte Zahlen zählen für die Bilanz, nicht für die Differenz.</p>';
+}
+
+/* ---------- Maps ---------- */
+function viewMaps() {
+  if (openMap) return viewMapDetail(openMap);
+  const rows = mapNames().map(n => {
+    const rs = roundsOf(n), info = mapInfo(n);
+    const best = rs.flatMap(m => playersOf(m).map(p => [p, totalOf(m,p)])).filter(x => x[1] != null && !isBot(x[0])).sort((a,b) => a[1]-b[1])[0];
+    const meta = rs.length ? (rs.length + ' Runde' + (rs.length>1?'n':'') + (best ? ' · Best ' + best[1] + ' (' + esc(best[0]) + ')' : '')) : 'noch nicht gespielt';
+    const type = (rs[0] && rs[0].type) || info.type || 'community';
+    return '<button class="maprow'+(rs.length?'':' unplayed')+'" data-map="'+esc(n)+'"><span class="name">'+esc(n)+'</span><span class="meta">'+type+' · '+meta+'</span></button>';
+  }).join('');
+  return '<h2>Map-Register</h2>'+rows+'<p class="note">Auf eine Map tippen für Spielerwerte, Loch-für-Loch-Karten und die Bestenliste.</p>';
+}
+
+function viewMapDetail(name) {
+  const rs = roundsOf(name), info = mapInfo(name);
+  const type = (rs[0] && rs[0].type) || info.type || 'community';
+  const pt = rs.length ? parTotal(rs[0]) : null;
+  const ps = [...new Set(rs.flatMap(playersOf))];
+
+  const rows = ps.map(p => {
+    const mine = rs.filter(m => playersOf(m).includes(p));
+    const totals = mine.map(m => totalOf(m,p)).filter(t => t != null);
+    const sts = mine.map(m => holeStats(m,p)).filter(Boolean);
+    const best = totals.length ? Math.min(...totals) : null;
+    const avg = totals.length ? sum(totals)/totals.length : null;
+    const avgSd = sts.length ? sum(sts.map(s => s.sd))/sts.length : null;
+    const worst = sts.length ? Math.max(...sts.map(s => s.worst)) : null;
+    const wins = mine.filter(m => winnerOf(m) === p).length;
+    return '<tr'+(p===ME?' class="me"':'')+'><td>'+esc(p)+'</td><td>'+mine.length+'</td><td>'+wins+'</td>' +
+      '<td>'+(best==null?'–':best)+'</td><td>'+(avg==null?'–':avg.toFixed(1))+'</td>' +
+      '<td>'+(best!=null&&pt!=null?fmtInt(best-pt):'–')+'</td>' +
+      '<td>'+(avgSd==null?'–':avgSd.toFixed(2))+'</td><td>'+(worst==null?'–':fmtInt(worst))+'</td></tr>';
+  }).join('');
+
+  const blocks = rs.map(m => {
+    let out = '';
+    if (m.par && m.scores) {
+      const head = m.par.map((_,i) => '<th>'+(i+1)+'</th>').join('');
+      const parRow = m.par.map(v => '<td class="muted">'+v+'</td>').join('');
+      const body = Object.keys(m.scores).map(p => '<tr'+(p===ME?' class="me"':'')+'><td>'+esc(p)+'</td>' +
+        m.scores[p].map((v,i) => '<td class="'+(v<m.par[i]?'win':v>m.par[i]?'loss':'')+'">'+v+'</td>').join('') +
+        '<td><strong>'+sum(m.scores[p])+'</strong></td></tr>').join('');
+      out += '<h3>Loch für Loch · '+m.date+'</h3><div class="scroll"><table><thead><tr><th>Loch</th>'+head+'<th>Ges</th></tr></thead><tbody><tr><td class="muted">Par</td>'+parRow+'<td class="muted">'+sum(m.par)+'</td></tr>'+body+'</tbody></table></div>';
+    }
+    if (m.note) out += '<p class="note">'+esc(m.note)+'</p>';
+    if (m.shot) out += '<figure><img loading="lazy" src="img/'+esc(m.shot)+'.jpg" alt="Bestenliste '+esc(name)+'" onerror="this.closest(\'figure\').remove()"><figcaption>Bestenliste im Spiel, '+m.date+'</figcaption></figure>';
+    return out;
+  }).join('');
+
+  const grades = info.grades || {};
+  const gradeList = Object.keys(grades).length
+    ? Object.entries(grades).map(([p,g]) => esc(p)+': '+esc(g)).join(' · ')
+    : 'noch keine Bewertung';
+
+  return '<button class="back" id="m-back">← Alle Maps</button>' +
+    '<h2 style="margin-top:0">'+esc(name)+'</h2>' +
+    '<p class="sub">'+type+(pt!=null?' · Par '+pt:'')+' · '+rs.length+' Runde'+(rs.length===1?'':'n')+'</p>' +
+    (info.note ? '<p class="note">'+esc(info.note)+'</p>' : '') +
+    '<p class="grade">Bewertungen — '+gradeList+'</p>' +
+    (ps.length ? '<h3>Spielerwerte auf dieser Map</h3><div class="scroll"><table><thead><tr><th>Spieler</th><th>Runden</th><th>Siege</th><th>Best</th><th>Ø</th><th>Best zu Par</th><th>Ø Streuung</th><th>schlecht. Loch</th></tr></thead><tbody>'+rows+'</tbody></table></div>' : '<p class="empty">Noch nicht gespielt.</p>') +
+    blocks;
+}
+
+/* ---------- Spieler ---------- */
+function viewPlayers() {
+  return '<h2>Spieler</h2>' + allPlayers().map(p => {
+    const ms = MATCHES.filter(m => playersOf(m).includes(p));
+    if (!ms.length) return '';
+    const wins = ms.filter(m => winnerOf(m) === p).length;
+    const places = ms.map(m => placeOf(m,p)).filter(x => x != null);
+    const avgPlace = places.length ? sum(places)/places.length : null;
+    const sts = ms.map(m => holeStats(m,p)).filter(Boolean);
+    const avgSd = sts.length ? sum(sts.map(s => s.sd))/sts.length : null;
+    const avgToPar = sts.length ? sum(sts.map(s => s.toPar))/sts.length : null;
+    const worst = sts.length ? Math.max(...sts.map(s => s.worst)) : null;
+    const rows = ms.map(m => {
+      const t = totalOf(m,p), pt = parTotal(m), pl = placeOf(m,p), n = playersOf(m).length;
+      const cls = pl === 1 ? 'win' : pl === n ? 'loss' : '';
+      return '<tr><td>'+esc(m.map)+'</td><td>'+(t==null?'–':t)+'</td><td>'+(t!=null&&pt!=null?fmtInt(t-pt):'–')+'</td><td>' +
+        (pl ? '<span class="'+cls+'">'+pl+'. von '+n+'</span>' : '<span class="muted">offen</span>') + '</td></tr>';
+    }).join('');
+    const ig = PLAYERS[p] && PLAYERS[p].ingame ? ' <span class="muted" style="font-weight:400">· '+esc(PLAYERS[p].ingame)+'</span>' : '';
+    const av = (PLAYERS[p] && PLAYERS[p].avatar) ? '<img class="avatar" src="'+esc(PLAYERS[p].avatar)+'" alt="" onerror="this.remove()">' : '';
+    return '<h3'+(p===ME?' style="color:var(--amber)"':'')+'>'+av+esc(p)+ig+'</h3>' +
+      '<p class="note">'+ms.length+' Runden · '+wins+' Rundensiege' +
+      ' · Stärke '+ratingOf(p).toFixed(2) +
+      (avgPlace!=null?' · Ø Platz '+avgPlace.toFixed(1):'') +
+      (avgToPar!=null?' · Ø '+fmt(avgToPar,1)+' zu Par':'') +
+      (avgSd!=null?' · Ø Streuung '+avgSd.toFixed(2):'') +
+      (worst!=null?' · schlechtestes Loch '+fmtInt(worst):'') + '</p>' +
+      '<div class="scroll"><table><thead><tr><th>Map</th><th>Ges</th><th>zu Par</th><th>Platz</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  }).join('');
+}
+
+/* ---------- render ---------- */
+function render() {
+  const tabs = [['matches','Runden'],['duels','Duelle'],['maps','Maps'],['players','Spieler']];
+  const view = ({ matches:viewMatches, duels:viewDuels, maps:viewMaps, players:viewPlayers })[tab]();
+  document.getElementById('root').innerHTML =
+    '<h1>Minigolf-Buch<span class="ro">nur lesen</span></h1>' +
+    '<p class="sub">' + MATCHES.length + ' Runden · Golf With Your Friends</p>' +
+    '<nav>' + tabs.map(([k,l]) => '<button data-tab="'+k+'" aria-current="'+(k===tab)+'">'+l+'</button>').join('') + '</nav>' +
+    view;
+  document.querySelectorAll('nav button').forEach(b => b.onclick = () => { tab = b.dataset.tab; openMap = null; render(); });
+  document.querySelectorAll('[data-map]').forEach(b => b.onclick = () => { tab = 'maps'; openMap = b.dataset.map; render(); scrollTo(0,0); });
+  const back = document.getElementById('m-back');
+  if (back) back.onclick = () => { openMap = null; render(); };
+}
+
+fetch('data.json')
+  .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+  .then(d => {
+    DATA = d;
+    MATCHES = d.matches || [];
+    MAPS = d.maps || {};
+    PLAYERS = d.players || {};
+    const self = Object.keys(PLAYERS).find(p => PLAYERS[p].self);
+    if (self) ME = self;
+    computeRating();
+    render();
+  })
+  .catch(e => {
+    document.getElementById('root').innerHTML =
+      '<h1>Minigolf-Buch</h1><div class="err"><strong>data.json konnte nicht geladen werden.</strong><br>' +
+      'Fehler: ' + esc(e.message) + '<br><br>' +
+      'Beim Öffnen direkt vom Dateisystem (file://) blockiert der Browser das Laden. ' +
+      'Die Seite funktioniert nur über eine echte Adresse, also über GitHub Pages.</div>';
+  });
+</script>
+</body>
+</html>

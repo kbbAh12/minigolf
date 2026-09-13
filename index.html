@@ -56,6 +56,7 @@
   .grade { font-size:12px; color:var(--chalk-dim); }
   .back { background:transparent; border:0; color:var(--chalk-dim); font-family:inherit; font-size:13px; cursor:pointer; padding:0 0 10px; }
   .back:hover { color:var(--chalk); }
+  .avatar { width:22px; height:22px; border-radius:50%; vertical-align:-5px; margin-right:7px; border:1px solid var(--green-line); }
   figure { margin:12px 0 0; }
   figure img { width:100%; height:auto; border:1px solid var(--green-line); border-radius:3px; display:block; }
   figcaption { font-size:12px; color:var(--chalk-dim); margin-top:5px; }
@@ -120,11 +121,61 @@ function holeStats(m,p) {
   const worst = Math.max(...d);
   return { toPar:sum(d), mean, sd, underOrPar:d.filter(x=>x<=0).length, worst, worstHole:d.indexOf(worst)+1, holes:d.length };
 }
+// Gegnerbereinigte Stärke (Bradley-Terry, Minorization-Maximization).
+// Ein Sieg gegen einen starken Gegner zählt mehr als einer gegen einen schwachen,
+// dadurch verzerrt es nicht, wenn jemand fast immer gegen den Besten spielt.
+let RATING = null;
+function pairPlace(m,p,a,b) {
+  const ta = totalOf(m,a), tb = totalOf(m,b);
+  if (ta != null && tb != null) return ta === tb ? null : (p === a ? (ta < tb ? 1 : 2) : (tb < ta ? 1 : 2));
+  const ra = rankOf(m,a), rb = rankOf(m,b);
+  if (ra != null && rb != null) return ra === rb ? null : (p === a ? (ra < rb ? 1 : 2) : (rb < ra ? 1 : 2));
+  if (m.winner === a || m.winner === b) return m.winner === p ? 1 : 2;
+  return null;
+}
+function computeRating() {
+  const ps = [...new Set(MATCHES.flatMap(playersOf))];
+  const W = {}; ps.forEach(p => W[p] = {});
+  MATCHES.forEach(m => {
+    const f = playersOf(m);
+    for (let i = 0; i < f.length; i++) for (let j = i+1; j < f.length; j++) {
+      const a = f[i], b = f[j], pa = pairPlace(m,a,a,b);
+      if (pa == null) continue;
+      const w = pa === 1 ? a : b, l = pa === 1 ? b : a;
+      W[w][l] = (W[w][l]||0) + 1;
+      if (W[l][w] == null) W[l][w] = 0;
+    }
+  });
+  let S = {}; ps.forEach(p => S[p] = 1);
+  for (let it = 0; it < 400; it++) {
+    const next = {};
+    ps.forEach(p => {
+      const wins = sum(Object.values(W[p])) + 0.5;     // halber virtueller Sieg als Dämpfung
+      let den = 0.5 / (S[p] + 1);
+      Object.keys(W[p]).forEach(q => {
+        const n = (W[p][q]||0) + (W[q][p]||0);
+        if (n) den += n / (S[p] + S[q]);
+      });
+      next[p] = den > 0 ? wins/den : S[p];
+    });
+    const g = Math.exp(sum(ps.map(p => Math.log(next[p])))/ps.length);
+    ps.forEach(p => S[p] = next[p]/g);
+  }
+  RATING = S;
+}
+const ratingOf = p => (RATING && RATING[p] != null) ? RATING[p] : 0;
+function roundCount(p) { return MATCHES.filter(m => playersOf(m).includes(p)).length; }
 function allPlayers() {
   const s = new Set();
   MATCHES.forEach(m => playersOf(m).forEach(p => s.add(p)));
   Object.values(MAPS).forEach(x => Object.keys(x.grades||{}).forEach(p => s.add(p)));
-  return [...s].sort((a,b) => a===ME ? -1 : b===ME ? 1 : a.localeCompare(b,'de'));
+  return [...s].sort((a,b) => {
+    if (a === ME) return -1;          // eigener Eintrag immer zuerst
+    if (b === ME) return 1;
+    const d = ratingOf(b) - ratingOf(a);
+    if (Math.abs(d) > 1e-9) return d;
+    return roundCount(b) - roundCount(a);
+  });
 }
 function duel(a,b) {
   let aw=0, bw=0, played=0, diff=0, diffN=0;
@@ -188,7 +239,7 @@ function viewDuels() {
     if (!d.played) return '';
     return '<tr><td>'+esc(p)+'</td><td>'+d.played+'</td><td class="'+(d.aw>d.bw?'win':d.aw<d.bw?'loss':'')+'">'+d.aw+':'+d.bw+'</td><td>'+(d.avgDiff==null?'–':fmt(d.avgDiff,1))+'</td></tr>';
   }).join('');
-  return '<h2>Duellmatrix</h2><div class="scroll"><table class="matrix"><caption>Zeile gegen Spalte, gelesen als Siege der Zeile zu Siegen der Spalte. Bots bleiben unberücksichtigt.</caption><thead><tr><th></th>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>' +
+  return '<h2>Duellmatrix</h2><div class="scroll"><table class="matrix"><caption>Zeile gegen Spalte, gelesen als Siege der Zeile zu Siegen der Spalte. Sortiert nach gegnerbereinigter Stärke, Bester oben. Bots bleiben unberücksichtigt.</caption><thead><tr><th></th>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>' +
     '<h2>Bilanz von kbb[AH]</h2><div class="scroll"><table><thead><tr><th>Gegner</th><th>Runden</th><th>Siege</th><th>Ø Schlagdifferenz</th></tr></thead><tbody>'+mine+'</tbody></table></div>' +
     '<p class="note">Negative Differenz heißt weniger Schläge im Schnitt. Runden ohne notierte Zahlen zählen für die Bilanz, nicht für die Differenz.</p>';
 }
@@ -275,8 +326,10 @@ function viewPlayers() {
         (pl ? '<span class="'+cls+'">'+pl+'. von '+n+'</span>' : '<span class="muted">offen</span>') + '</td></tr>';
     }).join('');
     const ig = PLAYERS[p] && PLAYERS[p].ingame ? ' <span class="muted" style="font-weight:400">· '+esc(PLAYERS[p].ingame)+'</span>' : '';
-    return '<h3'+(p===ME?' style="color:var(--amber)"':'')+'>'+esc(p)+ig+'</h3>' +
+    const av = (PLAYERS[p] && PLAYERS[p].avatar) ? '<img class="avatar" src="'+esc(PLAYERS[p].avatar)+'" alt="" onerror="this.remove()">' : '';
+    return '<h3'+(p===ME?' style="color:var(--amber)"':'')+'>'+av+esc(p)+ig+'</h3>' +
       '<p class="note">'+ms.length+' Runden · '+wins+' Rundensiege' +
+      ' · Stärke '+ratingOf(p).toFixed(2) +
       (avgPlace!=null?' · Ø Platz '+avgPlace.toFixed(1):'') +
       (avgToPar!=null?' · Ø '+fmt(avgToPar,1)+' zu Par':'') +
       (avgSd!=null?' · Ø Streuung '+avgSd.toFixed(2):'') +
@@ -309,6 +362,7 @@ fetch('data.json')
     PLAYERS = d.players || {};
     const self = Object.keys(PLAYERS).find(p => PLAYERS[p].self);
     if (self) ME = self;
+    computeRating();
     render();
   })
   .catch(e => {

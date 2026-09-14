@@ -30,6 +30,11 @@
    "ingame": "Lauser",
    "note": "Nickname ist selbstironisch gemeint, echter Spieler",
    "avatar": "https://avatars.fastly.steamstatic.com/c4daaca4d06a39936543e00e03a7f7cbea321f95_full.jpg"
+  },
+  "Mysli": {
+   "ingame": "mysli",
+   "avatar": "https://avatars.fastly.steamstatic.com/2a7cdda95138a6ca5290c31530da64eb0282c9ca_full.jpg",
+   "note": "Noch keine Runde gespielt."
   }
  },
  "matches": [
@@ -1914,6 +1919,130 @@
     "Florian": 133
    },
    "note": "Kein Screenshot, nur Endstände notiert."
+  },
+  {
+   "date": "2026-09-15",
+   "map": "Dämmerung",
+   "type": "offiziell",
+   "shot": "daemmerung-2",
+   "par": [
+    2,
+    2,
+    2,
+    3,
+    3,
+    3,
+    3,
+    4,
+    3,
+    3,
+    4,
+    2,
+    3,
+    3,
+    4,
+    3,
+    3,
+    3
+   ],
+   "scores": {
+    "Ich": [
+     1,
+     3,
+     2,
+     1,
+     4,
+     2,
+     4,
+     1,
+     5,
+     4,
+     4,
+     2,
+     3,
+     3,
+     3,
+     3,
+     3,
+     5
+    ],
+    "Florian": [
+     2,
+     1,
+     3,
+     6,
+     3,
+     2,
+     3,
+     2,
+     3,
+     3,
+     2,
+     1,
+     5,
+     5,
+     9,
+     3,
+     4,
+     6
+    ],
+    "Max": [
+     4,
+     3,
+     2,
+     5,
+     6,
+     2,
+     3,
+     2,
+     3,
+     3,
+     4,
+     2,
+     6,
+     2,
+     6,
+     3,
+     3,
+     5
+    ],
+    "Lauser (BOT)": [
+     3,
+     9,
+     2,
+     1,
+     4,
+     4,
+     4,
+     2,
+     5,
+     5,
+     6,
+     5,
+     6,
+     4,
+     4,
+     2,
+     6,
+     14
+    ]
+   },
+   "note": "Exakt Par gespielt und erstmals vor Max und Florian gelandet."
+  },
+  {
+   "date": "2026-09-15",
+   "map": "Worms Adventure",
+   "type": "community",
+   "order": [
+    [
+     "Max",
+     "Ich"
+    ],
+    [
+     "Florian"
+    ]
+   ],
+   "note": "Etwas eigenwillige Map. Max und ich unentschieden, Florian dahinter. Robin hat mitgespielt, ist aber zur Spielmitte rausgeflogen und wird deshalb nicht gewertet. Keine Schlagzahlen notiert."
   }
  ],
  "maps": {

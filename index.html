@@ -57,6 +57,25 @@
   .back { background:transparent; border:0; color:var(--chalk-dim); font-family:inherit; font-size:13px; cursor:pointer; padding:0 0 10px; }
   .back:hover { color:var(--chalk); }
   .avatar { width:22px; height:22px; border-radius:50%; vertical-align:-5px; margin-right:7px; border:1px solid var(--green-line); }
+  .pcard { border:1px solid var(--green-line); border-radius:4px; margin-bottom:8px; overflow:hidden; }
+  .pcard[open] { background:rgba(27,70,54,.35); }
+  .pcard.pme { border-color:var(--amber); }
+  .pcard summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 14px; }
+  .pcard summary::-webkit-details-marker { display:none; }
+  .pcard summary:hover { background:var(--green-mid); }
+  .pcard summary:focus-visible { outline:2px solid var(--amber); outline-offset:-2px; }
+  .prank { font-size:13px; color:var(--chalk-dim); min-width:16px; }
+  .pav { width:46px; height:46px; border-radius:6px; border:1px solid var(--green-line); flex:none; }
+  .pav-none { background:var(--green-mid); display:inline-block; }
+  .pname { font-size:19px; font-weight:600; letter-spacing:-.01em; display:flex; flex-direction:column; }
+  .pme .pname { color:var(--amber); }
+  .pname-ig { font-size:12px; font-weight:400; color:var(--chalk-dim); letter-spacing:0; }
+  .psum { margin-left:auto; font-size:12px; color:var(--chalk-dim); white-space:nowrap; }
+  .stats { display:flex; flex-wrap:wrap; gap:10px 22px; padding:4px 14px 14px; }
+  .stat { display:flex; flex-direction:column; }
+  .stat .sv { font-size:17px; font-weight:600; }
+  .stat .sl { font-size:11px; color:var(--chalk-dim); }
+  .pcard .scroll { margin:0; padding:0 14px 14px; }
   figure { margin:12px 0 0; }
   figure img { width:100%; height:auto; border:1px solid var(--green-line); border-radius:3px; display:block; }
   figcaption { font-size:12px; color:var(--chalk-dim); margin-top:5px; }
@@ -309,7 +328,7 @@ function viewMapDetail(name) {
 
 /* ---------- Spieler ---------- */
 function viewPlayers() {
-  return '<h2>Spieler</h2>' + allPlayers().map(p => {
+  return '<h2>Spieler</h2>' + allPlayers().map((p,i) => {
     const ms = MATCHES.filter(m => playersOf(m).includes(p));
     if (!ms.length) return '';
     const wins = ms.filter(m => winnerOf(m) === p).length;
@@ -319,26 +338,42 @@ function viewPlayers() {
     const avgSd = sts.length ? sum(sts.map(s => s.sd))/sts.length : null;
     const avgToPar = sts.length ? sum(sts.map(s => s.toPar))/sts.length : null;
     const worst = sts.length ? Math.max(...sts.map(s => s.worst)) : null;
+
     const rows = ms.map(m => {
       const t = totalOf(m,p), pt = parTotal(m), pl = placeOf(m,p), n = playersOf(m).length;
       const cls = pl === 1 ? 'win' : pl === n ? 'loss' : '';
-      return '<tr><td>'+esc(m.map)+'</td><td>'+(t==null?'–':t)+'</td><td>'+(t!=null&&pt!=null?fmtInt(t-pt):'–')+'</td><td>' +
+      return '<tr><td><button class="maplink" data-map="'+esc(m.map)+'">'+esc(m.map)+'</button></td>' +
+        '<td class="muted">'+esc(m.date)+'</td><td>'+(t==null?'–':t)+'</td>' +
+        '<td>'+(t!=null&&pt!=null?fmtInt(t-pt):'–')+'</td><td>' +
         (pl ? '<span class="'+cls+'">'+pl+'. von '+n+'</span>' : '<span class="muted">offen</span>') + '</td></tr>';
     }).join('');
-    const ig = PLAYERS[p] && PLAYERS[p].ingame ? ' <span class="muted" style="font-weight:400">· '+esc(PLAYERS[p].ingame)+'</span>' : '';
-    const av = (PLAYERS[p] && PLAYERS[p].avatar) ? '<img class="avatar" src="'+esc(PLAYERS[p].avatar)+'" alt="" onerror="this.remove()">' : '';
-    return '<h3'+(p===ME?' style="color:var(--amber)"':'')+'>'+av+esc(p)+ig+'</h3>' +
-      '<p class="note">'+ms.length+' Runden · '+wins+' Rundensiege' +
-      ' · Stärke '+ratingOf(p).toFixed(2) +
-      (avgPlace!=null?' · Ø Platz '+avgPlace.toFixed(1):'') +
-      (avgToPar!=null?' · Ø '+fmt(avgToPar,1)+' zu Par':'') +
-      (avgSd!=null?' · Ø Streuung '+avgSd.toFixed(2):'') +
-      (worst!=null?' · schlechtestes Loch '+fmtInt(worst):'') + '</p>' +
-      '<div class="scroll"><table><thead><tr><th>Map</th><th>Ges</th><th>zu Par</th><th>Platz</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+
+    const ig = PLAYERS[p] && PLAYERS[p].ingame ? '<span class="pname-ig">'+esc(PLAYERS[p].ingame)+'</span>' : '';
+    const av = (PLAYERS[p] && PLAYERS[p].avatar)
+      ? '<img class="pav" src="'+esc(PLAYERS[p].avatar)+'" alt="" onerror="this.remove()">'
+      : '<span class="pav pav-none"></span>';
+
+    const stat = (label,val) => '<div class="stat"><span class="sv">'+val+'</span><span class="sl">'+label+'</span></div>';
+    const statbar = '<div class="stats">' +
+      stat('Runden', ms.length) +
+      stat('Siege', wins) +
+      stat('Stärke', ratingOf(p).toFixed(2)) +
+      (avgPlace!=null ? stat('Ø Platz', avgPlace.toFixed(1)) : '') +
+      (avgToPar!=null ? stat('Ø zu Par', fmt(avgToPar,1)) : '') +
+      (avgSd!=null ? stat('Ø Streuung', avgSd.toFixed(2)) : '') +
+      (worst!=null ? stat('schlecht. Loch', fmtInt(worst)) : '') +
+      '</div>';
+
+    return '<details class="pcard'+(p===ME?' pme':'')+'"'+(i===0?' open':'')+'>' +
+      '<summary><span class="prank">'+(i+1)+'</span>'+av+
+        '<span class="pname">'+esc(p)+ig+'</span>' +
+        '<span class="psum">'+ms.length+' Runden · '+wins+' Siege</span></summary>' +
+      statbar +
+      '<div class="scroll"><table><thead><tr><th>Map</th><th>Datum</th><th>Ges</th><th>zu Par</th><th>Platz</th></tr></thead><tbody>'+rows+'</tbody></table></div>' +
+      '</details>';
   }).join('');
 }
 
-/* ---------- render ---------- */
 function render() {
   const tabs = [['matches','Runden'],['duels','Duelle'],['maps','Maps'],['players','Spieler']];
   const view = ({ matches:viewMatches, duels:viewDuels, maps:viewMaps, players:viewPlayers })[tab]();
@@ -353,7 +388,7 @@ function render() {
   if (back) back.onclick = () => { openMap = null; render(); };
 }
 
-fetch('data.json')
+fetch('data.json?v=' + Date.now(), { cache: 'no-store' })
   .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
   .then(d => {
     DATA = d;

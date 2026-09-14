@@ -57,6 +57,10 @@
   .back { background:transparent; border:0; color:var(--chalk-dim); font-family:inherit; font-size:13px; cursor:pointer; padding:0 0 10px; }
   .back:hover { color:var(--chalk); }
   .avatar { width:22px; height:22px; border-radius:50%; vertical-align:-5px; margin-right:7px; border:1px solid var(--green-line); }
+  .toggleall { background:transparent; border:1px solid var(--green-line); border-radius:2px;
+    color:var(--chalk-dim); font-family:inherit; font-size:11px; font-weight:400;
+    padding:3px 9px; margin-left:10px; cursor:pointer; vertical-align:2px; }
+  .toggleall:hover { color:var(--chalk); }
   .pcard { border:1px solid var(--green-line); border-radius:4px; margin-bottom:8px; overflow:hidden; }
   .pcard[open] { background:rgba(27,70,54,.35); }
   .pcard.pme { border-color:var(--amber); }
@@ -328,7 +332,7 @@ function viewMapDetail(name) {
 
 /* ---------- Spieler ---------- */
 function viewPlayers() {
-  return '<h2>Spieler</h2>' + allPlayers().map((p,i) => {
+  return '<h2>Spieler <button class="toggleall" id="p-toggle">alle zuklappen</button></h2>' + allPlayers().map((p,i) => {
     const ms = MATCHES.filter(m => playersOf(m).includes(p));
     if (!ms.length) return '';
     const wins = ms.filter(m => winnerOf(m) === p).length;
@@ -364,7 +368,7 @@ function viewPlayers() {
       (worst!=null ? stat('schlecht. Loch', fmtInt(worst)) : '') +
       '</div>';
 
-    return '<details class="pcard'+(p===ME?' pme':'')+'"'+(i===0?' open':'')+'>' +
+    return '<details class="pcard'+(p===ME?' pme':'')+'" open>' +
       '<summary><span class="prank">'+(i+1)+'</span>'+av+
         '<span class="pname">'+esc(p)+ig+'</span>' +
         '<span class="psum">'+ms.length+' Runden · '+wins+' Siege</span></summary>' +
@@ -384,6 +388,14 @@ function render() {
     view;
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => { tab = b.dataset.tab; openMap = null; render(); });
   document.querySelectorAll('[data-map]').forEach(b => b.onclick = () => { tab = 'maps'; openMap = b.dataset.map; render(); scrollTo(0,0); });
+  const tg = document.getElementById('p-toggle');
+  if (tg) tg.onclick = e => {
+    e.stopPropagation();
+    const cards = [...document.querySelectorAll('.pcard')];
+    const anyOpen = cards.some(c => c.open);
+    cards.forEach(c => c.open = !anyOpen);
+    tg.textContent = anyOpen ? 'alle aufklappen' : 'alle zuklappen';
+  };
   const back = document.getElementById('m-back');
   if (back) back.onclick = () => { openMap = null; render(); };
 }

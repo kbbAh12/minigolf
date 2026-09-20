@@ -97,7 +97,9 @@ let ME = 'Ich';
 let tab = 'matches', openMap = null;
 
 const sum = a => a.reduce((x,y)=>x+y,0);
-const totalOf = (m,p) => (m.scores && m.scores[p]) ? sum(m.scores[p]) : ((m.totals && m.totals[p] != null) ? m.totals[p] : null);
+const adjOf = (m,p) => (m.adjust && m.adjust[p]) ? m.adjust[p] : 0;
+const totalOf = (m,p) => (m.scores && m.scores[p]) ? sum(m.scores[p]) + adjOf(m,p)
+  : ((m.totals && m.totals[p] != null) ? m.totals[p] + adjOf(m,p) : null);
 const playersOf = m => {
   const s = new Set(Object.keys(m.scores || m.totals || {}));
   (m.order || []).forEach(g => g.forEach(p => s.add(p)));
@@ -218,6 +220,17 @@ function duel(a,b) {
   });
   return { played, aw, bw, avgDiff: diffN ? diff/diffN : null };
 }
+function strokeDuel(a,b) {
+  let sa=0, sb=0, n=0;
+  MATCHES.forEach(m => {
+    const ps = playersOf(m);
+    if (!ps.includes(a) || !ps.includes(b)) return;
+    const ta = totalOf(m,a), tb = totalOf(m,b);
+    if (ta == null || tb == null) return;
+    sa += ta; sb += tb; n++;
+  });
+  return { sa, sb, n, diff: sa - sb };
+}
 function mapNames() {
   const s = new Set(Object.keys(MAPS));
   MATCHES.forEach(m => s.add(m.map));
@@ -260,11 +273,24 @@ function viewDuels() {
   const mine = ps.filter(p => p !== ME).map(p => {
     const d = duel(ME,p);
     if (!d.played) return '';
-    return '<tr><td>'+esc(p)+'</td><td>'+d.played+'</td><td class="'+(d.aw>d.bw?'win':d.aw<d.bw?'loss':'')+'">'+d.aw+':'+d.bw+'</td><td>'+(d.avgDiff==null?'–':fmt(d.avgDiff,1))+'</td></tr>';
+    const sd = strokeDuel(ME,p);
+    return '<tr><td>'+esc(p)+'</td><td>'+d.played+'</td><td class="'+(d.aw>d.bw?'win':d.aw<d.bw?'loss':'')+'">'+d.aw+':'+d.bw+'</td><td>'+(d.avgDiff==null?'–':fmt(d.avgDiff,1))+'</td>' +
+      '<td class="'+(sd.n&&sd.diff<0?'win':sd.n&&sd.diff>0?'loss':'')+'">'+(sd.n?fmtInt(sd.diff):'–')+'</td></tr>';
   }).join('');
+  const strokeBody = ps.map(a => '<tr'+(a===ME?' class="me"':'')+'><th style="text-align:left">'+esc(a)+'</th>' +
+    ps.map(b => {
+      if (a === b) return '<td class="self">—</td>';
+      const dd = strokeDuel(a,b);
+      if (!dd.n) return '<td class="muted">·</td>';
+      return '<td class="'+(dd.diff<0?'win':dd.diff>0?'loss':'')+'" title="'+dd.sa+' zu '+dd.sb+' in '+dd.n+' Runden">'+fmtInt(dd.diff)+'</td>';
+    }).join('') + '</tr>').join('');
+
   return '<h2>Duellmatrix</h2><div class="scroll"><table class="matrix"><caption>Zeile gegen Spalte, gelesen als Siege der Zeile zu Siegen der Spalte. Sortiert nach gegnerbereinigter Stärke, Bester oben. Bots bleiben unberücksichtigt.</caption><thead><tr><th></th>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>' +
-    '<h2>Bilanz von kbb[AH]</h2><div class="scroll"><table><thead><tr><th>Gegner</th><th>Runden</th><th>Siege</th><th>Ø Schlagdifferenz</th></tr></thead><tbody>'+mine+'</tbody></table></div>' +
-    '<p class="note">Negative Differenz heißt weniger Schläge im Schnitt. Runden ohne notierte Zahlen zählen für die Bilanz, nicht für die Differenz.</p>';
+    '<h2>Bilanz von kbb[AH]</h2><div class="scroll"><table><thead><tr><th>Gegner</th><th>Runden</th><th>Siege</th><th>Ø Schlagdifferenz</th><th>Schlagsumme</th></tr></thead><tbody>'+mine+'</tbody></table></div>' +
+    '<p class="note">Negative Differenz heißt weniger Schläge im Schnitt. Runden ohne notierte Zahlen zählen für die Bilanz, nicht für die Differenz.</p>' +
+    '<h2>Schlagsummen-Duelle</h2><div class="scroll"><table class="matrix">' +
+    '<caption>Alle Schläge beider Spieler aus den Runden, in denen beide dabei waren, addiert. Minus heißt: die Zeile brauchte insgesamt weniger Schläge.</caption>' +
+    '<thead><tr><th></th>'+head+'</tr></thead><tbody>'+strokeBody+'</tbody></table></div>';
 }
 
 /* ---------- Maps ---------- */
@@ -308,7 +334,7 @@ function viewMapDetail(name) {
       const parRow = m.par.map(v => '<td class="muted">'+v+'</td>').join('');
       const body = Object.keys(m.scores).map(p => '<tr'+(p===ME?' class="me"':'')+'><td>'+esc(p)+'</td>' +
         m.scores[p].map((v,i) => '<td class="'+(v<m.par[i]?'win':v>m.par[i]?'loss':'')+'">'+v+'</td>').join('') +
-        '<td><strong>'+sum(m.scores[p])+'</strong></td></tr>').join('');
+        '<td><strong>'+totalOf(m,p)+'</strong>'+(adjOf(m,p)?' <span class="muted">('+fmtInt(adjOf(m,p))+')</span>':'')+'</td></tr>').join('');
       out += '<h3>Loch für Loch · '+m.date+'</h3><div class="scroll"><table><thead><tr><th>Loch</th>'+head+'<th>Ges</th></tr></thead><tbody><tr><td class="muted">Par</td>'+parRow+'<td class="muted">'+sum(m.par)+'</td></tr>'+body+'</tbody></table></div>';
     }
     if (m.note) out += '<p class="note">'+esc(m.note)+'</p>';

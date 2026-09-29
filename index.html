@@ -118,6 +118,13 @@
   .bar span:first-child { border-radius:3px 0 0 3px; } .bar span:last-child { border-radius:0 3px 3px 0; }
   .bn { width:34px; flex:none; text-align:right; font-size:11px; color:var(--chalk-dim); }
   .tview summary { font-size:12px; color:var(--chalk-dim); cursor:pointer; margin:6px 0; }
+  .duelpick { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 8px; font-size:13px; color:var(--chalk-dim); }
+  .duelpick select { background:var(--green-mid); color:var(--chalk); border:1px solid var(--green-line); border-radius:2px;
+    font-family:inherit; font-size:14px; padding:6px 8px; }
+  .duelpick select:focus-visible { outline:2px solid var(--amber); outline-offset:1px; }
+  .duelsum { font-size:13px; color:var(--chalk-dim); margin:0 0 6px; }
+  table.duel td:not(:first-child), table.duel th:not(:first-child) { width:28%; }
+  td.pick { cursor:pointer; } td.pick:hover { background:var(--green-mid); }
   .err { border:1px solid var(--brick); border-radius:3px; padding:12px 14px; color:var(--chalk); font-size:13px; }
 </style>
 </head>
@@ -127,18 +134,24 @@
 <script>
 let DATA = null, MATCHES = [], MAPS = {}, PLAYERS = {};
 let ME = 'Ich';
-let tab = 'matches', openMap = null, mapSort = 'az';
+let tab = 'matches', openMap = null, mapSort = 'az', duelA = null, duelB = null;
 
 // Adresse im Browser: #runden, #duelle, #maps, #maps/<Map-Name>, #spieler
 const SLUGS = { matches:'runden', duels:'duelle', maps:'maps', players:'spieler', stats:'statistik' };
-function go(t, map) {
-  location.hash = map ? 'maps/' + encodeURIComponent(map) : SLUGS[t];
+function go(t, map, pair) {
+  location.hash = map ? 'maps/' + encodeURIComponent(map)
+    : pair ? 'duelle/' + pair.map(encodeURIComponent).join('/') : SLUGS[t];
 }
 function readHash() {
   const h = decodeURIComponent(location.hash.slice(1));
   if (h.startsWith('maps/')) {
     tab = 'maps';
     openMap = mapNames().includes(h.slice(5)) ? h.slice(5) : null;
+    return;
+  }
+  if (h.startsWith('duelle/')) {
+    tab = 'duels'; openMap = null;
+    [duelA, duelB] = location.hash.slice(8).split('/').map(decodeURIComponent);
     return;
   }
   tab = Object.keys(SLUGS).find(k => SLUGS[k] === h) || 'matches';
@@ -165,15 +178,16 @@ function rankOf(m,p) {
   const i = m.order.findIndex(g => g.includes(p));
   return i < 0 ? null : i;
 }
-function winnerOf(m) {
-  if (m.winner) return m.winner;
-  if (m.order && m.order[0].length === 1) return m.order[0][0];
+// Alle Spieler auf Platz 1; bei Gleichstand an der Spitze mehrere
+function winnersOf(m) {
+  if (m.winner) return [m.winner];
+  if (m.order) return m.order[0];
   const sc = playersOf(m).map(p => [p, totalOf(m,p)]).filter(x => x[1] != null);
-  if (!sc.length) return null;
+  if (!sc.length) return [];
   const best = Math.min(...sc.map(x => x[1]));
-  const w = sc.filter(x => x[1] === best);
-  return w.length === 1 ? w[0][0] : null;
+  return sc.filter(x => x[1] === best).map(x => x[0]);
 }
+const winList = m => winnersOf(m).map(p => '<span class="win">'+esc(p)+'</span>').join(' & ');
 function placeOf(m,p) {
   const ps = playersOf(m);
   if (!ps.includes(p)) return null;
@@ -304,20 +318,120 @@ function viewMatches() {
       const n = MATCHES.filter(x => x.date === m.date).length;
       head = '<tr class="day"><td colspan="4">' + dayLabel(m.date) + ' · ' + n + ' Runde' + (n>1?'n':'') + '</td></tr>';
     }
-    const w = winnerOf(m), pt = parTotal(m);
+    const w = winnersOf(m), pt = parTotal(m);
     const cells = playersOf(m).map(p => {
       const t = totalOf(m,p);
-      return '<span class="' + (p===w?'win':'') + '">' + esc(p) + ' ' + (t==null?'–':t) + '</span>';
+      return '<span class="' + (w.includes(p)?'win':'') + '">' + esc(p) + ' ' + (t==null?'–':t) + '</span>';
     }).join(' · ');
     const short = m.note ? (m.note.length > 46 ? m.note.slice(0,44) + '…' : m.note) : '';
     return head + '<tr><td><button class="maplink" data-map="' + esc(m.map) + '">' + esc(m.map) + '</button>' +
       (short ? '<div class="note">' + esc(short) + '</div>' : '') + '</td>' +
       '<td class="muted">' + (pt==null?'–':pt) + '</td>' +
       '<td style="text-align:left">' + cells + '</td>' +
-      '<td>' + (w ? '<span class="win">'+esc(w)+'</span>' : '<span class="muted">offen</span>') + '</td></tr>';
+      '<td>' + (w.length ? winList(m) : '<span class="muted">offen</span>') + '</td></tr>';
   }).join('');
   return '<h2>Runden</h2><div class="scroll"><table><thead><tr><th>Map</th><th>Par</th><th>Ergebnisse</th><th>Sieger</th></tr></thead><tbody>'+rows+'</tbody></table></div>' +
     '<p class="note">Auf den Map-Namen tippen für Screenshot, Loch-für-Loch-Karte und die vollständige Notiz.</p>';
+}
+
+/* ---------- Duell-Vergleich ---------- */
+// Nur Runden, in denen beide dabei waren: gleiche Maps, andere Mitspieler zählen nicht
+function duelPair() {
+  const ps = allPlayers().filter(p => roundCount(p) > 0);
+  let a = ps.includes(duelA) ? duelA : ME;
+  const common = q => MATCHES.filter(m => playersOf(m).includes(a) && playersOf(m).includes(q)).length;
+  let b = ps.includes(duelB) && duelB !== a ? duelB
+    : ps.filter(p => p !== a).sort((x, y) => common(y) - common(x))[0];
+  return [a, b, ps];
+}
+
+function viewDuelCompare() {
+  const [a, b, ps] = duelPair();
+  const pick = (id, sel) => '<select id="'+id+'" aria-label="Spieler">' + ps.map(p =>
+    '<option'+(p===sel?' selected':'')+'>'+esc(p)+'</option>').join('') + '</select>';
+  const head = '<div class="duelpick">'+pick('duel-a', a)+'<span>gegen</span>'+pick('duel-b', b)+'</div>';
+  if (!b || a === b) return '<h2>Duell-Vergleich</h2>' + head + '<p class="empty">Zwei verschiedene Spieler wählen.</p>';
+
+  const rs = MATCHES.filter(m => playersOf(m).includes(a) && playersOf(m).includes(b));
+  if (!rs.length) return '<h2>Duell-Vergleich</h2>' + head + '<p class="empty">Noch keine gemeinsame Runde.</p>';
+
+  let aw = 0, bw = 0, even = 0;
+  const num = [], holes = { a: {n:0}, b: {n:0} };
+  let hw = 0, hh = 0, hl = 0;
+  rs.forEach(m => {
+    const pl = pairPlace(m, a, a, b);
+    if (pl === 1) aw++; else if (pl === 2) bw++; else even++;
+    const ta = totalOf(m, a), tb = totalOf(m, b);
+    if (ta != null && tb != null) num.push({ m, ta, tb, pt: parTotal(m) });
+    if (m.par && m.scores && m.scores[a] && m.scores[b]) {
+      m.par.forEach((par, i) => {
+        const x = m.scores[a][i], y = m.scores[b][i];
+        [[holes.a, x], [holes.b, y]].forEach(([c, v]) => { c.n++; const k = bucketOf(v, par); c[k] = (c[k] || 0) + 1; });
+        if (x < y) hw++; else if (x > y) hl++; else hh++;
+      });
+    }
+  });
+  const avg = f => num.length ? sum(num.map(f)) / num.length : null;
+  const withPar = num.filter(r => r.pt != null);
+  const avgPar = f => withPar.length ? sum(withPar.map(f)) / withPar.length : null;
+  const f1 = v => v == null ? '–' : v.toFixed(1).replace('.', ',');
+  const fp = v => v == null ? '–' : fmt(v, 1).replace('.', ',');
+  const better = (x, y, low) => x == null || y == null || x === y ? ['', ''] : ((x < y) === low ? ['win', 'loss'] : ['loss', 'win']);
+  const row = (label, x, y, fx, low) => {
+    const [ca, cb] = better(x, y, low);
+    return '<tr><td>'+label+'</td><td class="'+ca+'">'+fx(x)+'</td><td class="'+cb+'">'+fx(y)+'</td></tr>';
+  };
+  const pctf = v => v == null ? '–' : Math.round(100 * v) + ' %';
+  const under = c => c.n ? ((c.ace || 0) + (c.under || 0)) / c.n : null;
+  const over2 = c => c.n ? ((c.b2 || 0) + (c.b14 || 0)) / c.n : null;
+  const ha = holes.a.n ? holes.a : null;
+
+  const table = '<div class="scroll"><table class="duel"><thead><tr><th></th><th>'+esc(a)+'</th><th>'+esc(b)+'</th></tr></thead><tbody>' +
+    row('Runden vorn', aw, bw, v => v, false) +
+    row('Ø Schläge', avg(r => r.ta), avg(r => r.tb), f1, true) +
+    row('Ø zu Par', avgPar(r => r.ta - r.pt), avgPar(r => r.tb - r.pt), fp, true) +
+    row('Schläge gesamt', num.length ? sum(num.map(r => r.ta)) : null, num.length ? sum(num.map(r => r.tb)) : null, v => v == null ? '–' : v, true) +
+    (ha ? row('Löcher gewonnen', hw, hl, v => v, false) +
+      row('Asse', holes.a.ace || 0, holes.b.ace || 0, v => v, false) +
+      row('Löcher unter Par', under(holes.a), under(holes.b), pctf, false) +
+      row('Löcher +2 und schlechter', over2(holes.a), over2(holes.b), pctf, true) +
+      row('14er', holes.a.b14 || 0, holes.b.b14 || 0, v => v, true) : '') +
+    '</tbody></table></div>';
+
+  const summary = '<p class="duelsum">'+rs.length+' gemeinsame Runde'+(rs.length>1?'n':'')+' · ' +
+    esc(a)+' vorn in '+aw+', '+esc(b)+' in '+bw+(even ? ', '+even+' gleichauf oder offen' : '') +
+    (ha ? ' · Löcher '+hw+':'+hl+' bei '+hh+' geteilten' : '') + '</p>';
+
+  // Kumulierter Vorsprung über die gemeinsamen Runden mit Zahlen
+  let run = 0;
+  const lead = num.map(r => (run += r.tb - r.ta));
+  const span = Math.max(10, Math.max(0, ...lead) - Math.min(0, ...lead));
+  const step = [5, 10, 20, 25, 50, 100, 200, 250, 500].find(v => span / v <= 5) || 1000;
+  const lo = Math.floor(Math.min(0, ...lead) / step) * step, hi = Math.ceil(Math.max(0, ...lead) / step) * step;
+  const ticks = [];
+  for (let v = lo; v <= hi; v += step) ticks.push(v);
+  const chart = num.length >= 2 ? '<p class="charttitle">Vorsprung von '+esc(a)+' in Schlägen, Runde für Runde aufaddiert (unter null: '+esc(b)+' vorn)</p>' +
+    lineChart({
+      xs: num.map(r => dayLabel(r.m.date)), series: [{ name: a, vals: lead }],
+      yTicks: ticks, yPos: v => (v - lo) / ((hi - lo) || 1),
+      fmtTick: v => v > 0 ? '+' + v : String(v).replace('-', '−'),
+      fmtVal: v => (v > 0 ? '+' : '') + v,
+      tipTitle: (lab, i) => lab + ' · ' + num[i].m.map
+    }) : '';
+
+  const list = rs.slice().reverse().map(m => {
+    const ta = totalOf(m, a), tb = totalOf(m, b), pl = pairPlace(m, a, a, b);
+    const d = ta != null && tb != null ? ta - tb : null;
+    return '<tr><td><button class="maplink" data-map="'+esc(m.map)+'">'+esc(m.map)+'</button></td>' +
+      '<td class="muted">'+dayLabel(m.date)+'</td>' +
+      '<td class="'+(pl===1?'win':'')+'">'+(ta == null ? (pl===1?'vorn':'–') : ta)+'</td>' +
+      '<td class="'+(pl===2?'win':'')+'">'+(tb == null ? (pl===2?'vorn':'–') : tb)+'</td>' +
+      '<td>'+(d == null ? '–' : fmtInt(d))+'</td></tr>';
+  }).join('');
+
+  return '<h2>Duell-Vergleich</h2>' + head + summary + table + chart +
+    '<details class="tview"'+(rs.length <= 10 ? ' open' : '')+'><summary>Alle '+rs.length+' gemeinsamen Runden</summary><div class="scroll"><table><thead><tr><th>Map</th><th>Tag</th><th>'+esc(a)+'</th><th>'+esc(b)+'</th><th>Differenz</th></tr></thead><tbody>'+list+'</tbody></table></div></details>' +
+    '<p class="note">Nur Runden, in denen beide dabei waren, egal wie viele sonst mitgespielt haben. Weil beide dieselben Maps gespielt haben, spielt die Schwierigkeit der Maps keine Rolle. Grün markiert den jeweils besseren Wert. Runden ohne Zahlen zählen nur bei „Runden vorn“.</p>';
 }
 
 /* ---------- Duelle ---------- */
@@ -329,7 +443,7 @@ function viewDuels() {
       if (a === b) return '<td class="self">—</td>';
       const d = duel(a,b);
       if (!d.played) return '<td class="muted">·</td>';
-      return '<td class="'+(d.aw>d.bw?'win':d.bw>d.aw?'loss':'')+'">'+d.aw+':'+d.bw+'</td>';
+      return '<td class="pick '+(d.aw>d.bw?'win':d.bw>d.aw?'loss':'')+'" data-da="'+esc(a)+'" data-db="'+esc(b)+'" title="Duell '+esc(a)+' gegen '+esc(b)+' öffnen">'+d.aw+':'+d.bw+'</td>';
     }).join('') + '</tr>').join('');
   const mine = ps.filter(p => p !== ME).map(p => {
     const d = duel(ME,p);
@@ -346,7 +460,7 @@ function viewDuels() {
       return '<td class="'+(d.diff<0?'win':d.diff>0?'loss':'')+'" title="'+d.sa+' zu '+d.sb+' in '+d.n+' Runden">'+fmtInt(d.diff)+'</td>';
     }).join('') + '</tr>').join('');
 
-  return '<h2>Duellmatrix</h2><div class="scroll"><table class="matrix"><caption>Zeile gegen Spalte, gelesen als Siege der Zeile zu Siegen der Spalte. Sortiert nach gegnerbereinigter Stärke, Bester oben.</caption><thead><tr><th></th>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>' +
+  return viewDuelCompare() + '<h2>Duellmatrix</h2><div class="scroll"><table class="matrix"><caption>Zeile gegen Spalte, gelesen als Siege der Zeile zu Siegen der Spalte. Sortiert nach gegnerbereinigter Stärke, Bester oben. Eine Zelle antippen öffnet oben den Duell-Vergleich.</caption><thead><tr><th></th>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>' +
     '<h2>Bilanz von kbb[AH]</h2><div class="scroll"><table><thead><tr><th>Gegner</th><th>Runden</th><th>Siege</th><th>Ø Schlagdifferenz</th><th>Schlagsumme</th></tr></thead><tbody>'+mine+'</tbody></table></div>' +
     '<p class="note">Negative Differenz heißt weniger Schläge im Schnitt. Runden ohne notierte Zahlen zählen für die Bilanz, nicht für die Differenz.</p>' +
     '<h2>Schlagsummen-Duelle</h2><div class="scroll"><table class="matrix">' +
@@ -390,7 +504,7 @@ function viewMapDetail(name) {
     const avg = totals.length ? sum(totals)/totals.length : null;
     const avgSd = sts.length ? sum(sts.map(s => s.sd))/sts.length : null;
     const worst = sts.length ? Math.max(...sts.map(s => s.worst)) : null;
-    const wins = mine.filter(m => winnerOf(m) === p).length;
+    const wins = mine.filter(m => winnersOf(m).includes(p)).length;
     return '<tr'+(p===ME?' class="me"':'')+'><td>'+esc(p)+'</td><td>'+mine.length+'</td><td>'+wins+'</td>' +
       '<td>'+(best==null?'–':best)+'</td><td>'+(avg==null?'–':avg.toFixed(1))+'</td>' +
       '<td>'+(best!=null&&pt!=null?fmtInt(best-pt):'–')+'</td>' +
@@ -433,7 +547,7 @@ function viewPlayers() {
   return '<h2>Spieler <button class="toggleall" id="p-toggle">alle zuklappen</button></h2>' + allPlayers().map((p,i) => {
     const ms = MATCHES.filter(m => playersOf(m).includes(p));
     if (!ms.length) return '';
-    const wins = ms.filter(m => winnerOf(m) === p).length;
+    const wins = ms.filter(m => winnersOf(m).includes(p)).length;
     const places = ms.map(m => placeOf(m,p)).filter(x => x != null);
     const avgPlace = places.length ? sum(places)/places.length : null;
     const sts = ms.map(m => holeStats(m,p)).filter(Boolean);
@@ -523,7 +637,7 @@ function lineChart({ xs, series, yTicks, yPos, fmtTick, fmtVal, xTitle, lowIsGoo
   svg += '<line class="xhair" y1="'+T+'" y2="'+(H-B)+'" x1="0" x2="0" visibility="hidden"/>' +
     '<rect class="hit" x="'+L+'" y="0" width="'+pw+'" height="'+H+'" fill="transparent"/>';
   CHARTS[id] = { xs, series, x, n, L, pw, fmtVal, lowIsGood, tipTitle: tipTitle || (s => s) };
-  const legend = '<div class="legend">' + series.map(s =>
+  const legend = series.length < 2 ? '' : '<div class="legend">' + series.map(s =>
     '<span><i style="background:'+colorOf(s.name)+'"></i>'+esc(s.name)+'</span>').join('') + '</div>';
   return legend + '<div class="chart" data-chart="'+id+'"><svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg><div class="tip" hidden></div></div>';
 }
@@ -537,11 +651,11 @@ function bindCharts() {
       const i = Math.max(0, Math.min(c.n - 1, Math.round((e.clientX - r.left - c.L) / (c.pw / Math.max(1, c.n - 1)))));
       xh.setAttribute('x1', c.x(i)); xh.setAttribute('x2', c.x(i)); xh.setAttribute('visibility', 'visible');
       const rows = c.series.filter(s => s.vals[i] != null).sort((a, b) => c.lowIsGood ? a.vals[i] - b.vals[i] : b.vals[i] - a.vals[i]);
-      tip.innerHTML = '<strong>'+esc(c.tipTitle(c.xs[i]))+'</strong>' + rows.map(s =>
+      tip.innerHTML = '<strong>'+esc(c.tipTitle(c.xs[i], i))+'</strong>' + rows.map(s =>
         '<div><i style="background:'+colorOf(s.name)+'"></i>'+esc(s.name)+'<span>'+c.fmtVal(s.vals[i])+'</span></div>').join('');
       tip.hidden = false;
       const left = c.x(i) + 12 + tip.offsetWidth > r.width ? c.x(i) - 12 - tip.offsetWidth : c.x(i) + 12;
-      tip.style.left = left + 'px';
+      tip.style.left = Math.max(0, Math.min(left, r.width - tip.offsetWidth)) + 'px';
     });
     el.querySelector('.hit').addEventListener('pointerleave', hide);
   });
@@ -658,7 +772,7 @@ function viewStats() {
   }).sort((a, b) => b.changes - a.changes || b.leaders - a.leaders || a.margin - b.margin).slice(0, 8);
   const thrillRows = thrill.map(t => '<tr><td><button class="maplink" data-map="'+esc(t.m.map)+'">'+esc(t.m.map)+'</button></td>' +
     '<td class="muted">'+dayLabel(t.m.date)+'</td><td>'+t.changes+'</td><td>'+t.leaders+'</td>' +
-    '<td>'+(winnerOf(t.m) ? '<span class="win">'+esc(winnerOf(t.m))+'</span>' : '<span class="muted">geteilt</span>')+'</td>' +
+    '<td>'+winList(t.m)+'</td>' +
     '<td>'+(t.margin == null ? '–' : t.margin)+'</td></tr>').join('');
 
   return '<h2>Statistik</h2>' +
@@ -697,6 +811,9 @@ function render() {
     view;
   document.querySelectorAll('nav button').forEach(b => b.onclick = () => go(b.dataset.tab));
   document.querySelectorAll('[data-map]').forEach(b => b.onclick = () => go('maps', b.dataset.map));
+  document.querySelectorAll('[data-da]').forEach(c => c.onclick = () => { go('duels', null, [c.dataset.da, c.dataset.db]); scrollTo(0,0); });
+  ['duel-a','duel-b'].forEach(id => { const el = document.getElementById(id); if (el) el.onchange = () =>
+    go('duels', null, [document.getElementById('duel-a').value, document.getElementById('duel-b').value]); });
   document.querySelectorAll('[data-sort]').forEach(b => b.onclick = () => { mapSort = b.dataset.sort; render(); });
   const tg = document.getElementById('p-toggle');
   if (tg) tg.onclick = e => {

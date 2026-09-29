@@ -85,6 +85,16 @@
   figcaption { font-size:12px; color:var(--chalk-dim); margin-top:5px; }
   .ro { display:inline-block; font-size:11px; color:var(--chalk-dim); border:1px solid var(--green-line);
     border-radius:2px; padding:2px 7px; margin-left:8px; vertical-align:middle; }
+  .holes th:first-child, .holes td:first-child { position:sticky; left:0; z-index:1; background:var(--green-deep); box-shadow:1px 0 0 var(--green-line); }
+  .scroll.flush { margin:0; padding:0; }
+  tr.day td { padding:14px 2px 3px; font-size:11px; color:var(--chalk-dim); border-bottom:0; letter-spacing:.02em; }
+  tbody tr.day:first-child td { padding-top:4px; }
+  .sortbar { display:flex; flex-wrap:wrap; align-items:center; gap:4px; font-size:12px; color:var(--chalk-dim); margin:-4px 0 6px; }
+  .sortbar button { background:transparent; border:1px solid transparent; border-radius:2px; color:var(--chalk-dim);
+    font-family:inherit; font-size:12px; padding:3px 8px; cursor:pointer; }
+  .sortbar button:hover { color:var(--chalk); }
+  .sortbar button[aria-pressed="true"] { color:var(--chalk); border-color:var(--green-line); }
+  .sortbar button:focus-visible { outline:2px solid var(--amber); outline-offset:1px; }
   .err { border:1px solid var(--brick); border-radius:3px; padding:12px 14px; color:var(--chalk); font-size:13px; }
 </style>
 </head>
@@ -94,7 +104,23 @@
 <script>
 let DATA = null, MATCHES = [], MAPS = {}, PLAYERS = {};
 let ME = 'Ich';
-let tab = 'matches', openMap = null;
+let tab = 'matches', openMap = null, mapSort = 'az';
+
+// Adresse im Browser: #runden, #duelle, #maps, #maps/<Map-Name>, #spieler
+const SLUGS = { matches:'runden', duels:'duelle', maps:'maps', players:'spieler' };
+function go(t, map) {
+  location.hash = map ? 'maps/' + encodeURIComponent(map) : SLUGS[t];
+}
+function readHash() {
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (h.startsWith('maps/')) {
+    tab = 'maps';
+    openMap = mapNames().includes(h.slice(5)) ? h.slice(5) : null;
+    return;
+  }
+  tab = Object.keys(SLUGS).find(k => SLUGS[k] === h) || 'matches';
+  openMap = null;
+}
 
 const sum = a => a.reduce((x,y)=>x+y,0);
 const adjOf = (m,p) => (m.adjust && m.adjust[p]) ? m.adjust[p] : 0;
@@ -240,22 +266,34 @@ const roundsOf = n => MATCHES.filter(m => m.map === n);
 const mapInfo = n => MAPS[n] || {};
 
 /* ---------- Runden ---------- */
+const WEEKDAYS = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+function dayLabel(iso) {
+  const [y,mo,d] = iso.split('-').map(Number);
+  return WEEKDAYS[new Date(y, mo-1, d).getDay()] + ' ' + String(d).padStart(2,'0') + '.' + String(mo).padStart(2,'0') + '.';
+}
 function viewMatches() {
-  const rows = MATCHES.map(m => {
+  // Neueste zuerst, mit einer unauffälligen Zeile pro Spieltag
+  let lastDate = null;
+  const rows = MATCHES.slice().reverse().map(m => {
+    let head = '';
+    if (m.date !== lastDate) {
+      lastDate = m.date;
+      const n = MATCHES.filter(x => x.date === m.date).length;
+      head = '<tr class="day"><td colspan="4">' + dayLabel(m.date) + ' · ' + n + ' Runde' + (n>1?'n':'') + '</td></tr>';
+    }
     const w = winnerOf(m), pt = parTotal(m);
     const cells = playersOf(m).map(p => {
       const t = totalOf(m,p);
       return '<span class="' + (p===w?'win':'') + '">' + esc(p) + ' ' + (t==null?'–':t) + '</span>';
     }).join(' · ');
     const short = m.note ? (m.note.length > 46 ? m.note.slice(0,44) + '…' : m.note) : '';
-    return '<tr><td><button class="maplink" data-map="' + esc(m.map) + '">' + esc(m.map) + '</button>' +
+    return head + '<tr><td><button class="maplink" data-map="' + esc(m.map) + '">' + esc(m.map) + '</button>' +
       (short ? '<div class="note">' + esc(short) + '</div>' : '') + '</td>' +
-      '<td class="muted">' + m.date + '</td>' +
       '<td class="muted">' + (pt==null?'–':pt) + '</td>' +
       '<td style="text-align:left">' + cells + '</td>' +
       '<td>' + (w ? '<span class="win">'+esc(w)+'</span>' : '<span class="muted">offen</span>') + '</td></tr>';
   }).join('');
-  return '<h2>Runden</h2><div class="scroll"><table><thead><tr><th>Map</th><th>Datum</th><th>Par</th><th>Ergebnisse</th><th>Sieger</th></tr></thead><tbody>'+rows+'</tbody></table></div>' +
+  return '<h2>Runden</h2><div class="scroll"><table><thead><tr><th>Map</th><th>Par</th><th>Ergebnisse</th><th>Sieger</th></tr></thead><tbody>'+rows+'</tbody></table></div>' +
     '<p class="note">Auf den Map-Namen tippen für Screenshot, Loch-für-Loch-Karte und die vollständige Notiz.</p>';
 }
 
@@ -285,7 +323,7 @@ function viewDuels() {
       return '<td class="'+(d.diff<0?'win':d.diff>0?'loss':'')+'" title="'+d.sa+' zu '+d.sb+' in '+d.n+' Runden">'+fmtInt(d.diff)+'</td>';
     }).join('') + '</tr>').join('');
 
-  return '<h2>Duellmatrix</h2><div class="scroll"><table class="matrix"><caption>Zeile gegen Spalte, gelesen als Siege der Zeile zu Siegen der Spalte. Sortiert nach gegnerbereinigter Stärke, Bester oben. Bots bleiben unberücksichtigt.</caption><thead><tr><th></th>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>' +
+  return '<h2>Duellmatrix</h2><div class="scroll"><table class="matrix"><caption>Zeile gegen Spalte, gelesen als Siege der Zeile zu Siegen der Spalte. Sortiert nach gegnerbereinigter Stärke, Bester oben.</caption><thead><tr><th></th>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>' +
     '<h2>Bilanz von kbb[AH]</h2><div class="scroll"><table><thead><tr><th>Gegner</th><th>Runden</th><th>Siege</th><th>Ø Schlagdifferenz</th><th>Schlagsumme</th></tr></thead><tbody>'+mine+'</tbody></table></div>' +
     '<p class="note">Negative Differenz heißt weniger Schläge im Schnitt. Runden ohne notierte Zahlen zählen für die Bilanz, nicht für die Differenz.</p>' +
     '<h2>Schlagsummen-Duelle</h2><div class="scroll"><table class="matrix">' +
@@ -296,14 +334,23 @@ function viewDuels() {
 /* ---------- Maps ---------- */
 function viewMaps() {
   if (openMap) return viewMapDetail(openMap);
-  const rows = mapNames().map(n => {
+  const lastPlayed = n => roundsOf(n).reduce((d,m) => m.date > d ? m.date : d, '');
+  const byName = (a,b) => a.localeCompare(b,'de');
+  const sorters = {
+    az: byName,
+    oft: (a,b) => roundsOf(b).length - roundsOf(a).length || lastPlayed(b).localeCompare(lastPlayed(a)) || byName(a,b),
+    zuletzt: (a,b) => lastPlayed(b).localeCompare(lastPlayed(a)) || byName(a,b)
+  };
+  const sortBar = '<div class="sortbar">Sortieren: ' + [['az','A–Z'],['oft','am häufigsten'],['zuletzt','zuletzt gespielt']]
+    .map(([k,l]) => '<button data-sort="'+k+'" aria-pressed="'+(k===mapSort)+'">'+l+'</button>').join('') + '</div>';
+  const rows = mapNames().sort(sorters[mapSort]).map(n => {
     const rs = roundsOf(n), info = mapInfo(n);
     const best = rs.flatMap(m => playersOf(m).map(p => [p, totalOf(m,p)])).filter(x => x[1] != null && !isBot(x[0])).sort((a,b) => a[1]-b[1])[0];
     const meta = rs.length ? (rs.length + ' Runde' + (rs.length>1?'n':'') + (best ? ' · Best ' + best[1] + ' (' + esc(best[0]) + ')' : '')) : 'noch nicht gespielt';
     const type = (rs[0] && rs[0].type) || info.type || 'community';
     return '<button class="maprow'+(rs.length?'':' unplayed')+'" data-map="'+esc(n)+'"><span class="name">'+esc(n)+'</span><span class="meta">'+type+' · '+meta+'</span></button>';
   }).join('');
-  return '<h2>Map-Register</h2>'+rows+'<p class="note">Auf eine Map tippen für Spielerwerte, Loch-für-Loch-Karten und die Bestenliste.</p>';
+  return '<h2>Map-Register</h2>'+sortBar+rows+'<p class="note">Auf eine Map tippen für Spielerwerte, Loch-für-Loch-Karten und die Bestenliste.</p>';
 }
 
 function viewMapDetail(name) {
@@ -335,10 +382,10 @@ function viewMapDetail(name) {
       const body = Object.keys(m.scores).map(p => '<tr'+(p===ME?' class="me"':'')+'><td>'+esc(p)+'</td>' +
         m.scores[p].map((v,i) => '<td class="'+(v<m.par[i]?'win':v>m.par[i]?'loss':'')+'">'+v+'</td>').join('') +
         '<td><strong>'+totalOf(m,p)+'</strong>'+(adjOf(m,p)?' <span class="muted">('+fmtInt(adjOf(m,p))+')</span>':'')+'</td></tr>').join('');
-      out += '<h3>Loch für Loch · '+m.date+'</h3><div class="scroll"><table><thead><tr><th>Loch</th>'+head+'<th>Ges</th></tr></thead><tbody><tr><td class="muted">Par</td>'+parRow+'<td class="muted">'+sum(m.par)+'</td></tr>'+body+'</tbody></table></div>';
+      out += '<h3>Loch für Loch · '+dayLabel(m.date)+'</h3><div class="scroll flush"><table class="holes"><thead><tr><th>Loch</th>'+head+'<th>Ges</th></tr></thead><tbody><tr><td class="muted">Par</td>'+parRow+'<td class="muted">'+sum(m.par)+'</td></tr>'+body+'</tbody></table></div>';
     }
     if (m.note) out += '<p class="note">'+esc(m.note)+'</p>';
-    if (m.shot) out += '<figure><img loading="lazy" src="img/'+esc(m.shot)+'.jpg" alt="Bestenliste '+esc(name)+'" onerror="this.closest(\'figure\').remove()"><figcaption>Bestenliste im Spiel, '+m.date+'</figcaption></figure>';
+    if (m.shot) out += '<figure><img loading="lazy" src="img/'+esc(m.shot)+'.jpg" alt="Bestenliste '+esc(name)+'" onerror="this.closest(\'figure\').remove()"><figcaption>Bestenliste im Spiel, '+dayLabel(m.date)+'</figcaption></figure>';
     return out;
   }).join('');
 
@@ -412,8 +459,9 @@ function render() {
     '<p class="sub">' + MATCHES.length + ' Runden · Golf With Your Friends</p>' +
     '<nav>' + tabs.map(([k,l]) => '<button data-tab="'+k+'" aria-current="'+(k===tab)+'">'+l+'</button>').join('') + '</nav>' +
     view;
-  document.querySelectorAll('nav button').forEach(b => b.onclick = () => { tab = b.dataset.tab; openMap = null; render(); });
-  document.querySelectorAll('[data-map]').forEach(b => b.onclick = () => { tab = 'maps'; openMap = b.dataset.map; render(); scrollTo(0,0); });
+  document.querySelectorAll('nav button').forEach(b => b.onclick = () => go(b.dataset.tab));
+  document.querySelectorAll('[data-map]').forEach(b => b.onclick = () => go('maps', b.dataset.map));
+  document.querySelectorAll('[data-sort]').forEach(b => b.onclick = () => { mapSort = b.dataset.sort; render(); });
   const tg = document.getElementById('p-toggle');
   if (tg) tg.onclick = e => {
     e.stopPropagation();
@@ -423,8 +471,14 @@ function render() {
     tg.textContent = anyOpen ? 'alle aufklappen' : 'alle zuklappen';
   };
   const back = document.getElementById('m-back');
-  if (back) back.onclick = () => { openMap = null; render(); };
+  if (back) back.onclick = () => go('maps');
 }
+
+window.addEventListener('hashchange', () => {
+  readHash();
+  render();
+  if (openMap) scrollTo(0,0);
+});
 
 fetch('data.json?v=' + Date.now(), { cache: 'no-store' })
   .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
@@ -436,6 +490,7 @@ fetch('data.json?v=' + Date.now(), { cache: 'no-store' })
     const self = Object.keys(PLAYERS).find(p => PLAYERS[p].self);
     if (self) ME = self;
     computeRating();
+    readHash();
     render();
   })
   .catch(e => {

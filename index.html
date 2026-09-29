@@ -785,7 +785,47 @@ function viewStats() {
     '<p class="note">Anteil der Löcher nach Ergebnis gegenüber Par. Ass zählt jedes Loch mit einem Schlag, 14er jedes Loch mit der Höchstzahl. Bug-Korrekturen sind eingerechnet.</p>' +
     '<h3>Lochwettspiel</h3><div class="scroll"><table class="matrix"><caption>Einzelne Löcher gewonnen zu verloren, Zeile gegen Spalte, aus allen gemeinsamen Runden mit Lochwerten. Mit der Maus über eine Zelle fahren zeigt auch die geteilten Löcher.</caption><thead><tr><th></th>'+mpHead+'</tr></thead><tbody>'+mpBody+'</tbody></table></div>' +
     '<h3>Spannendste Runden</h3><div class="scroll"><table><thead><tr><th>Map</th><th>Tag</th><th>Führungs&shy;wechsel</th><th>Führende</th><th>Sieger</th><th>Abstand</th></tr></thead><tbody>'+thrillRows+'</tbody></table></div>' +
-    '<p class="note">Wie oft die alleinige Führung nach einem Loch wechselte, und wie viele verschiedene Spieler vorn lagen. Abstand: Schläge zwischen Platz 1 und 2. Den Verlauf jeder Runde zeigt die Map-Seite.</p>';
+    '<p class="note">Wie oft die alleinige Führung nach einem Loch wechselte, und wie viele verschiedene Spieler vorn lagen. Abstand: Schläge zwischen Platz 1 und 2. Den Verlauf jeder Runde zeigt die Map-Seite.</p>' +
+    viewSections();
+}
+
+// Abschnitte einer Runde: wie gut war jemand auf bestimmten Löchern im Vergleich zu seinen Mitspielern?
+// Erscheint erst, wenn genug Runden dafür da sind (Runden mit 18 Lochwerten und mindestens 3 Spielern).
+const SECTIONS_MIN_ROUNDS = 60;
+const SECTIONS = [[1,3],[1,6],[4,12],[7,12],[7,18],[9,18],[16,18],[4,18],[1,18]];
+function viewSections(force) {
+  const rs = withHoles().filter(m => m.par.length === 18 && Object.keys(m.scores).length >= 3);
+  if (rs.length < SECTIONS_MIN_ROUNDS && !force) return '';
+  const ps = allPlayers().filter(p => rs.filter(m => m.scores[p]).length >= 10);
+  const label = ([a,b]) => a + '–' + b;
+  const vsOthers = (p, a, b) => {
+    const v = [];
+    rs.forEach(m => {
+      if (!m.scores[p]) return;
+      const others = Object.keys(m.scores).filter(q => q !== p);
+      for (let i = a - 1; i < b; i++) v.push(m.scores[p][i] - sum(others.map(q => m.scores[q][i])) / others.length);
+    });
+    return v.length ? sum(v) / v.length : null;
+  };
+  const winsIn = (p, a, b) => rs.filter(m => {
+    if (!m.scores[p]) return false;
+    const t = q => sum(m.scores[q].slice(a - 1, b));
+    return t(p) === Math.min(...Object.keys(m.scores).map(t));
+  }).length;
+  const head = '<tr><th>Spieler</th>' + SECTIONS.map(s => '<th>'+label(s)+'</th>').join('') + '</tr>';
+  const perHole = ps.map(p => '<tr'+(p===ME?' class="me"':'')+'><td>'+esc(p)+'</td>' + SECTIONS.map(([a,b]) => {
+    const v = vsOthers(p, a, b);
+    const r = v == null ? null : Math.round(v * 100) / 100;
+    return '<td class="'+(r<0?'win':r>0?'loss':'')+'">'+(r == null ? '–' : r === 0 ? '±0,00' : fmt(r, 2).replace('.', ','))+'</td>';
+  }).join('') + '</tr>').join('');
+  const wins = ps.map(p => '<tr'+(p===ME?' class="me"':'')+'><td>'+esc(p)+'</td>' +
+    SECTIONS.map(([a,b]) => '<td>'+winsIn(p, a, b)+'</td>').join('') + '</tr>').join('');
+  return '<h3>Abschnitte</h3>' +
+    '<p class="charttitle">Schläge pro Loch gegenüber dem Schnitt der Mitspieler, nur in den Löchern des Abschnitts. Minus heißt besser.</p>' +
+    '<div class="scroll flush"><table class="holes"><thead>'+head+'</thead><tbody>'+perHole+'</tbody></table></div>' +
+    '<p class="charttitle">Rundensiege, wenn nur die Löcher des Abschnitts gezählt hätten (geteilte Siege mitgezählt).</p>' +
+    '<div class="scroll flush"><table class="holes"><thead>'+head+'</thead><tbody>'+wins+'</tbody></table></div>' +
+    '<p class="note">Grundlage: '+rs.length+' Runden mit allen 18 Lochwerten und mindestens 3 Spielern. 1-gegen-1-Runden zählen nicht, weil dort nur ein einzelner Gegner der Vergleich wäre. Spieler mit mindestens 10 solchen Runden.</p>';
 }
 
 function progressChart(m) {

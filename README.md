@@ -83,6 +83,10 @@ Das passt hier, weil nicht jeder gleich oft gegen jeden spielt und die Runden un
 
 Technisch: MM-Algorithmus mit 400 Iterationen, ein halber virtueller Sieg pro Spieler als Dämpfung (damit wenige Runden keine Extremwerte erzeugen), normiert auf das geometrische Mittel 1. Werte über 1 heißen stärker als der Durchschnitt.
 
+## Vorbereitete Auswertungen
+
+Der Statistik-Tab enthält schon den Teil **Abschnitte**: Wie gut war jemand auf bestimmten Löchern (z. B. 1–3, 7–12, 16–18) im Vergleich zu seinen Mitspielern, und wer hätte gewonnen, wenn nur diese Löcher gezählt hätten? Er erscheint automatisch, sobald es mindestens 60 Runden mit allen 18 Lochwerten und mindestens 3 Spielern gibt, vorher sind die Werte zu unsicher. Die Schwelle steht in `index.html` als `SECTIONS_MIN_ROUNDS`, die Abschnitte als `SECTIONS`.
+
 ## Commit-Nachrichten
 
 Kurz sagen, was sich geändert hat, statt „Add files via upload“:

@@ -95,6 +95,29 @@
   .sortbar button:hover { color:var(--chalk); }
   .sortbar button[aria-pressed="true"] { color:var(--chalk); border-color:var(--green-line); }
   .sortbar button:focus-visible { outline:2px solid var(--amber); outline-offset:1px; }
+  .legend { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:12px; color:var(--chalk-dim); margin:4px 0 6px; }
+  .legend i, .tip i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+  .chart { position:relative; overflow:hidden; }
+  .chart svg { display:block; touch-action:pan-y; }
+  .chart .grid { stroke:var(--green-line); stroke-width:1; }
+  .chart .tick { fill:var(--chalk-dim); font-size:11px; }
+  .chart .endlab { fill:var(--chalk); font-size:11px; }
+  .chart .dot { stroke:var(--green-deep); stroke-width:2; }
+  .chart .xhair { stroke:var(--chalk-dim); stroke-width:1; stroke-dasharray:3 3; }
+  .tip { position:absolute; top:6px; background:var(--green-mid); border:1px solid var(--green-line); border-radius:3px;
+    padding:6px 9px; font-size:12px; pointer-events:none; min-width:120px; }
+  .tip div { display:flex; align-items:center; gap:2px; }
+  .tip div span { margin-left:auto; padding-left:12px; }
+  .charttitle { font-size:12px; color:var(--chalk-dim); margin:14px 0 0; }
+  .bars { display:flex; flex-direction:column; gap:6px; margin:6px 0 4px; }
+  .brow { display:flex; align-items:center; gap:10px; font-size:13px; }
+  .brow.me .bname { color:var(--amber); }
+  .bname { width:92px; flex:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bar { flex:1; display:flex; gap:2px; height:14px; }
+  .bar span { min-width:2px; }
+  .bar span:first-child { border-radius:3px 0 0 3px; } .bar span:last-child { border-radius:0 3px 3px 0; }
+  .bn { width:34px; flex:none; text-align:right; font-size:11px; color:var(--chalk-dim); }
+  .tview summary { font-size:12px; color:var(--chalk-dim); cursor:pointer; margin:6px 0; }
   .err { border:1px solid var(--brick); border-radius:3px; padding:12px 14px; color:var(--chalk); font-size:13px; }
 </style>
 </head>
@@ -107,7 +130,7 @@ let ME = 'Ich';
 let tab = 'matches', openMap = null, mapSort = 'az';
 
 // Adresse im Browser: #runden, #duelle, #maps, #maps/<Map-Name>, #spieler
-const SLUGS = { matches:'runden', duels:'duelle', maps:'maps', players:'spieler' };
+const SLUGS = { matches:'runden', duels:'duelle', maps:'maps', players:'spieler', stats:'statistik' };
 function go(t, map) {
   location.hash = map ? 'maps/' + encodeURIComponent(map) : SLUGS[t];
 }
@@ -184,10 +207,10 @@ function pairPlace(m,p,a,b) {
   if (m.winner === a || m.winner === b) return m.winner === p ? 1 : 2;
   return null;
 }
-function computeRating() {
-  const ps = [...new Set(MATCHES.flatMap(playersOf))];
+function computeRating(matches) {
+  const ps = [...new Set(matches.flatMap(playersOf))];
   const W = {}; ps.forEach(p => W[p] = {});
-  MATCHES.forEach(m => {
+  matches.forEach(m => {
     const f = playersOf(m);
     for (let i = 0; i < f.length; i++) for (let j = i+1; j < f.length; j++) {
       const a = f[i], b = f[j], pa = pairPlace(m,a,a,b);
@@ -212,7 +235,7 @@ function computeRating() {
     const g = Math.exp(sum(ps.map(p => Math.log(next[p])))/ps.length);
     ps.forEach(p => S[p] = next[p]/g);
   }
-  RATING = S;
+  return S;
 }
 const ratingOf = p => (RATING && RATING[p] != null) ? RATING[p] : 0;
 function roundCount(p) { return MATCHES.filter(m => playersOf(m).includes(p)).length; }
@@ -384,6 +407,8 @@ function viewMapDetail(name) {
         '<td><strong>'+totalOf(m,p)+'</strong>'+(adjOf(m,p)?' <span class="muted">('+fmtInt(adjOf(m,p))+')</span>':'')+'</td></tr>').join('');
       out += '<h3>Loch für Loch · '+dayLabel(m.date)+'</h3><div class="scroll flush"><table class="holes"><thead><tr><th>Loch</th>'+head+'<th>Ges</th></tr></thead><tbody><tr><td class="muted">Par</td>'+parRow+'<td class="muted">'+sum(m.par)+'</td></tr>'+body+'</tbody></table></div>';
     }
+    if (m.par && m.scores && Object.keys(m.scores).length > 1)
+      out += '<p class="charttitle">Verlauf · Schläge hinter dem Führenden nach jedem Loch</p>' + progressChart(m);
     if (m.note) out += '<p class="note">'+esc(m.note)+'</p>';
     if (m.shot) out += '<figure><img loading="lazy" src="img/'+esc(m.shot)+'.jpg" alt="Bestenliste '+esc(name)+'" onerror="this.closest(\'figure\').remove()"><figcaption>Bestenliste im Spiel, '+dayLabel(m.date)+'</figcaption></figure>';
     return out;
@@ -451,9 +476,220 @@ function viewPlayers() {
   }).join('');
 }
 
+/* ---------- Diagramme ---------- */
+// Feste Farbe pro Spieler (geprüft gegen den dunkelgrünen Hintergrund, auch bei Farbsehschwäche)
+const PCOLOR = { Max:'#3987e5', Henry:'#d95926', Florian:'#199e70', Ich:'#c98500', Robin:'#d55181', ShiN:'#9085e9', Sencesless:'#e66767' };
+const colorOf = p => PCOLOR[p] || '#93a39a';
+const CHARTS = {};
+let chartSeq = 0;
+const chartWidth = () => Math.max(300, Math.min(968, document.querySelector('.wrap').clientWidth - 32));
+
+// Liniendiagramm. series: [{name, vals:[Zahl|null]}], yPos(v) liefert 0..1 (0 = unten)
+function lineChart({ xs, series, yTicks, yPos, fmtTick, fmtVal, xTitle, lowIsGood, tipTitle }) {
+  const id = 'c' + (++chartSeq), W = chartWidth(), H = 230, L = 38, R = 78, T = 10, B = 30;
+  const n = xs.length, pw = W - L - R, ph = H - T - B;
+  const x = i => L + (n > 1 ? i * pw / (n - 1) : pw / 2);
+  const y = v => T + (1 - yPos(v)) * ph;
+  let svg = '';
+  yTicks.forEach(v => {
+    svg += '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(v)+'" y2="'+y(v)+'" class="grid"/>' +
+      '<text x="'+(L-6)+'" y="'+(y(v)+4)+'" text-anchor="end" class="tick">'+fmtTick(v)+'</text>';
+  });
+  const step = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(pw / 46))));
+  xs.forEach((lab, i) => {
+    if (i % step && i !== n - 1) return;
+    svg += '<text x="'+x(i)+'" y="'+(H-B+16)+'" text-anchor="middle" class="tick">'+esc(lab)+'</text>';
+  });
+  if (xTitle) svg += '<text x="'+(W-R)+'" y="'+(H-2)+'" text-anchor="end" class="tick">'+esc(xTitle)+'</text>';
+  const ends = [];
+  series.forEach(s => {
+    let d = '', pen = false;
+    s.vals.forEach((v, i) => {
+      if (v == null) { pen = false; return; }
+      d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1) + ' ';
+      pen = true;
+    });
+    svg += '<path d="'+d+'" fill="none" stroke="'+colorOf(s.name)+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+    s.vals.forEach((v, i) => {
+      if (v != null) svg += '<circle cx="'+x(i)+'" cy="'+y(v)+'" r="3.5" fill="'+colorOf(s.name)+'" class="dot"/>';
+    });
+    const last = s.vals.reduce((k, v, i) => v != null ? i : k, -1);
+    if (last >= 0) ends.push({ name: s.name, x: x(last), y: y(s.vals[last]) });
+  });
+  // Namen am Linienende, bei Überlappung auseinanderschieben
+  ends.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i-1].y < 13) ends[i].y = ends[i-1].y + 13;
+  ends.forEach(e => { svg += '<text x="'+(e.x+8)+'" y="'+(e.y+4)+'" class="endlab">'+esc(e.name)+'</text>'; });
+  svg += '<line class="xhair" y1="'+T+'" y2="'+(H-B)+'" x1="0" x2="0" visibility="hidden"/>' +
+    '<rect class="hit" x="'+L+'" y="0" width="'+pw+'" height="'+H+'" fill="transparent"/>';
+  CHARTS[id] = { xs, series, x, n, L, pw, fmtVal, lowIsGood, tipTitle: tipTitle || (s => s) };
+  const legend = '<div class="legend">' + series.map(s =>
+    '<span><i style="background:'+colorOf(s.name)+'"></i>'+esc(s.name)+'</span>').join('') + '</div>';
+  return legend + '<div class="chart" data-chart="'+id+'"><svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg><div class="tip" hidden></div></div>';
+}
+
+function bindCharts() {
+  document.querySelectorAll('[data-chart]').forEach(el => {
+    const c = CHARTS[el.dataset.chart], svg = el.querySelector('svg'), tip = el.querySelector('.tip'), xh = el.querySelector('.xhair');
+    const hide = () => { tip.hidden = true; xh.setAttribute('visibility', 'hidden'); };
+    el.querySelector('.hit').addEventListener('pointermove', e => {
+      const r = svg.getBoundingClientRect();
+      const i = Math.max(0, Math.min(c.n - 1, Math.round((e.clientX - r.left - c.L) / (c.pw / Math.max(1, c.n - 1)))));
+      xh.setAttribute('x1', c.x(i)); xh.setAttribute('x2', c.x(i)); xh.setAttribute('visibility', 'visible');
+      const rows = c.series.filter(s => s.vals[i] != null).sort((a, b) => c.lowIsGood ? a.vals[i] - b.vals[i] : b.vals[i] - a.vals[i]);
+      tip.innerHTML = '<strong>'+esc(c.tipTitle(c.xs[i]))+'</strong>' + rows.map(s =>
+        '<div><i style="background:'+colorOf(s.name)+'"></i>'+esc(s.name)+'<span>'+c.fmtVal(s.vals[i])+'</span></div>').join('');
+      tip.hidden = false;
+      const left = c.x(i) + 12 + tip.offsetWidth > r.width ? c.x(i) - 12 - tip.offsetWidth : c.x(i) + 12;
+      tip.style.left = left + 'px';
+    });
+    el.querySelector('.hit').addEventListener('pointerleave', hide);
+  });
+}
+
+/* ---------- Statistik ---------- */
+const withHoles = () => MATCHES.filter(m => m.par && m.scores);
+const pct = (a, n) => n ? Math.round(100 * a / n) : 0;
+
+function formSeries() {
+  const days = [...new Set(MATCHES.map(m => m.date))].sort();
+  const players = allPlayers().filter(p => roundCount(p) >= 8);
+  const snaps = days.map(d => computeRating(MATCHES.filter(m => m.date <= d)));
+  return { days, series: players.map(p => ({ name: p, vals: snaps.map(s => s[p] != null ? s[p] : null) })) };
+}
+
+function vsField() {
+  const acc = {};
+  MATCHES.forEach(m => {
+    const ps = playersOf(m), t = ps.map(p => totalOf(m, p));
+    if (ps.length < 3 || t.some(v => v == null)) return;
+    const avg = sum(t) / t.length;
+    ps.forEach((p, i) => (acc[p] = acc[p] || []).push(t[i] - avg));
+  });
+  return Object.entries(acc).map(([p, d]) => ({ p, n: d.length, avg: sum(d) / d.length, best: Math.min(...d) }))
+    .sort((a, b) => a.avg - b.avg);
+}
+
+const BUCKETS = [
+  ['ace', 'Ass', '#8cbcf2'], ['under', 'unter Par', '#3272c4'], ['par', 'Par', '#5d6e65'],
+  ['b1', '+1', '#a3504a'], ['b2', '+2 und mehr', '#d9443f'], ['b14', '14er', '#ff9a8f']
+];
+function bucketOf(x, par) {
+  if (x === 1) return 'ace';
+  if (x === 14) return 'b14';
+  return x < par ? 'under' : x === par ? 'par' : x === par + 1 ? 'b1' : 'b2';
+}
+function holeSpread() {
+  const acc = {};
+  withHoles().forEach(m => Object.entries(m.scores).forEach(([p, s]) => {
+    const c = acc[p] = acc[p] || { n: 0 };
+    s.forEach((x, i) => { c.n++; const k = bucketOf(x, m.par[i]); c[k] = (c[k] || 0) + 1; });
+  }));
+  return acc;
+}
+
+function holeDuel(a, b) {
+  let w = 0, h = 0, l = 0;
+  withHoles().forEach(m => {
+    if (!m.scores[a] || !m.scores[b]) return;
+    m.scores[a].forEach((x, i) => { const y = m.scores[b][i]; if (x < y) w++; else if (x > y) l++; else h++; });
+  });
+  return { w, h, l };
+}
+
+// Zwischenstand nach jedem Loch: Schläge hinter dem Führenden
+function progressOf(m) {
+  const ps = Object.keys(m.scores), cum = {}, behind = {};
+  ps.forEach(p => { cum[p] = 0; behind[p] = []; });
+  let lead = null, changes = 0;
+  const leaders = new Set();
+  m.par.forEach((_, i) => {
+    ps.forEach(p => cum[p] += m.scores[p][i]);
+    const best = Math.min(...ps.map(p => cum[p]));
+    ps.forEach(p => behind[p].push(cum[p] - best));
+    const L = ps.filter(p => cum[p] === best);
+    if (L.length === 1) { if (lead && L[0] !== lead) changes++; lead = L[0]; leaders.add(lead); }
+  });
+  return { ps, behind, changes, leaders: leaders.size };
+}
+
+function viewStats() {
+  const nH = withHoles().length;
+  const logPos = (lo, hi) => v => (Math.log(v) - Math.log(lo)) / (Math.log(hi) - Math.log(lo));
+
+  const f = formSeries();
+  const allV = f.series.flatMap(s => s.vals).filter(v => v != null);
+  const lo = Math.min(0.5, ...allV) * 0.9, hi = Math.max(2, ...allV) * 1.1;
+  const form = lineChart({
+    xs: f.days.map(dayLabel), series: f.series,
+    yTicks: [0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32].filter(v => v >= lo && v <= hi),
+    yPos: logPos(lo, hi), fmtTick: v => String(v).replace('.', ','), fmtVal: v => v.toFixed(2).replace('.', ',')
+  });
+
+  const field = vsField().map(r => '<tr'+(r.p===ME?' class="me"':'')+'><td>'+esc(r.p)+'</td><td>'+r.n+'</td>' +
+    '<td class="'+(r.avg<0?'win':r.avg>0?'loss':'')+'">'+fmt(r.avg,1).replace('.',',')+'</td>' +
+    '<td>'+fmt(r.best,1).replace('.',',')+'</td></tr>').join('');
+
+  const spread = holeSpread();
+  const spreadPlayers = allPlayers().filter(p => spread[p]);
+  const legend = '<div class="legend">' + BUCKETS.map(([, l, c]) => '<span><i style="background:'+c+'"></i>'+l+'</span>').join('') + '</div>';
+  const bars = spreadPlayers.map(p => {
+    const c = spread[p];
+    const segs = BUCKETS.map(([k, l, col]) => c[k] ? '<span style="flex:'+c[k]+';background:'+col+'" title="'+l+': '+pct(c[k],c.n)+' % ('+c[k]+' Löcher)"></span>' : '').join('');
+    return '<div class="brow'+(p===ME?' me':'')+'"><span class="bname">'+esc(p)+'</span><span class="bar">'+segs+'</span><span class="bn">'+c.n+'</span></div>';
+  }).join('');
+  const spreadTable = '<details class="tview"><summary>Als Tabelle</summary><div class="scroll"><table><thead><tr><th>Spieler</th><th>Löcher</th>' +
+    BUCKETS.map(([, l]) => '<th>'+l+'</th>').join('') + '</tr></thead><tbody>' +
+    spreadPlayers.map(p => { const c = spread[p]; return '<tr'+(p===ME?' class="me"':'')+'><td>'+esc(p)+'</td><td>'+c.n+'</td>' +
+      BUCKETS.map(([k]) => '<td>'+pct(c[k]||0,c.n)+' %</td>').join('') + '</tr>'; }).join('') + '</tbody></table></div></details>';
+
+  const mp = allPlayers().filter(p => withHoles().filter(m => m.scores[p]).length >= 5);
+  const mpHead = mp.map(p => '<th>'+esc(p)+'</th>').join('');
+  const mpBody = mp.map(a => '<tr'+(a===ME?' class="me"':'')+'><th style="text-align:left">'+esc(a)+'</th>' + mp.map(b => {
+    if (a === b) return '<td class="self">—</td>';
+    const d = holeDuel(a, b);
+    if (!d.w && !d.l && !d.h) return '<td class="muted">·</td>';
+    return '<td class="'+(d.w>d.l?'win':d.l>d.w?'loss':'')+'" title="'+d.w+' gewonnen, '+d.h+' geteilt, '+d.l+' verloren">'+d.w+':'+d.l+'</td>';
+  }).join('') + '</tr>').join('');
+
+  const thrill = withHoles().map(m => {
+    const pr = progressOf(m), ts = pr.ps.map(p => totalOf(m, p)).sort((a, b) => a - b);
+    return { m, ...pr, margin: ts.length > 1 ? ts[1] - ts[0] : null };
+  }).sort((a, b) => b.changes - a.changes || b.leaders - a.leaders || a.margin - b.margin).slice(0, 8);
+  const thrillRows = thrill.map(t => '<tr><td><button class="maplink" data-map="'+esc(t.m.map)+'">'+esc(t.m.map)+'</button></td>' +
+    '<td class="muted">'+dayLabel(t.m.date)+'</td><td>'+t.changes+'</td><td>'+t.leaders+'</td>' +
+    '<td>'+(winnerOf(t.m) ? '<span class="win">'+esc(winnerOf(t.m))+'</span>' : '<span class="muted">geteilt</span>')+'</td>' +
+    '<td>'+(t.margin == null ? '–' : t.margin)+'</td></tr>').join('');
+
+  return '<h2>Statistik</h2>' +
+    '<p class="note" style="margin-top:-4px">Loch-Auswertungen beruhen auf den '+nH+' Runden mit Lochwerten, von '+MATCHES.length+' insgesamt.</p>' +
+    '<h3>Formkurve</h3>' + form +
+    '<p class="note">Stärke-Wert nach jedem Spieltag, berechnet aus allen Runden bis dahin. 1 ist der Durchschnitt, 2 heißt doppelt so gute Gewinnchance im direkten Vergleich. Spieler mit mindestens 8 Runden.</p>' +
+    '<h3>Schläge gegenüber dem Rundenschnitt</h3><div class="scroll"><table><thead><tr><th>Spieler</th><th>Runden</th><th>Ø</th><th>beste Runde</th></tr></thead><tbody>'+field+'</tbody></table></div>' +
+    '<p class="note">Wie viele Schläge man im Schnitt weniger (−) oder mehr (+) brauchte als der Durchschnitt aller Mitspieler derselben Runde. Unabhängig davon, wie schwer die Map ist. Nur Runden mit mindestens 3 Spielern und Zahlen für alle.</p>' +
+    '<h3>Loch-Verteilung</h3>' + legend + '<div class="bars">'+bars+'</div>' + spreadTable +
+    '<p class="note">Anteil der Löcher nach Ergebnis gegenüber Par. Ass zählt jedes Loch mit einem Schlag, 14er jedes Loch mit der Höchstzahl. Bug-Korrekturen sind eingerechnet.</p>' +
+    '<h3>Lochwettspiel</h3><div class="scroll"><table class="matrix"><caption>Einzelne Löcher gewonnen zu verloren, Zeile gegen Spalte, aus allen gemeinsamen Runden mit Lochwerten. Mit der Maus über eine Zelle fahren zeigt auch die geteilten Löcher.</caption><thead><tr><th></th>'+mpHead+'</tr></thead><tbody>'+mpBody+'</tbody></table></div>' +
+    '<h3>Spannendste Runden</h3><div class="scroll"><table><thead><tr><th>Map</th><th>Tag</th><th>Führungs&shy;wechsel</th><th>Führende</th><th>Sieger</th><th>Abstand</th></tr></thead><tbody>'+thrillRows+'</tbody></table></div>' +
+    '<p class="note">Wie oft die alleinige Führung nach einem Loch wechselte, und wie viele verschiedene Spieler vorn lagen. Abstand: Schläge zwischen Platz 1 und 2. Den Verlauf jeder Runde zeigt die Map-Seite.</p>';
+}
+
+function progressChart(m) {
+  const pr = progressOf(m);
+  const max = Math.max(1, ...pr.ps.flatMap(p => pr.behind[p]));
+  const top = Math.ceil(max / 5) * 5;
+  const ticks = [0, top / 2, top].filter((v, i, a) => a.indexOf(v) === i && Number.isInteger(v));
+  return lineChart({
+    xs: m.par.map((_, i) => String(i + 1)), xTitle: 'Loch',
+    series: pr.ps.map(p => ({ name: p, vals: pr.behind[p] })),
+    yTicks: ticks, yPos: v => 1 - v / top, fmtTick: v => v ? '+' + v : 'vorn',
+    fmtVal: v => v ? '+' + v : 'vorn', lowIsGood: true, tipTitle: h => 'Loch ' + h
+  });
+}
+
 function render() {
-  const tabs = [['matches','Runden'],['duels','Duelle'],['maps','Maps'],['players','Spieler']];
-  const view = ({ matches:viewMatches, duels:viewDuels, maps:viewMaps, players:viewPlayers })[tab]();
+  const tabs = [['matches','Runden'],['duels','Duelle'],['maps','Maps'],['players','Spieler'],['stats','Statistik']];
+  const view = ({ matches:viewMatches, duels:viewDuels, maps:viewMaps, players:viewPlayers, stats:viewStats })[tab]();
   document.getElementById('root').innerHTML =
     '<h1>Minigolf-Buch<span class="ro">nur lesen</span></h1>' +
     '<p class="sub">' + MATCHES.length + ' Runden · Golf With Your Friends</p>' +
@@ -472,7 +708,20 @@ function render() {
   };
   const back = document.getElementById('m-back');
   if (back) back.onclick = () => go('maps');
+  bindCharts();
+  lastW = chartWidth();
 }
+
+// Diagramme bei geänderter Breite neu zeichnen
+let lastW = 0, resizeT = null;
+addEventListener('resize', () => {
+  clearTimeout(resizeT);
+  resizeT = setTimeout(() => {
+    const w = chartWidth();
+    if (w !== lastW && document.querySelector('[data-chart]')) render();
+    lastW = w;
+  }, 150);
+});
 
 window.addEventListener('hashchange', () => {
   readHash();
@@ -489,7 +738,7 @@ fetch('data.json?v=' + Date.now(), { cache: 'no-store' })
     PLAYERS = d.players || {};
     const self = Object.keys(PLAYERS).find(p => PLAYERS[p].self);
     if (self) ME = self;
-    computeRating();
+    RATING = computeRating(MATCHES);
     readHash();
     render();
   })

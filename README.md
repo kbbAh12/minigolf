@@ -53,6 +53,14 @@ Manchmal treten auf einem Loch aber Bugs auf. Dann hat ein Spieler mehr Schläge
 - Wer während einer Runde rausfliegt, wird normalerweise nicht gewertet. Ausnahmen stehen in der Notiz.
 - Runden ohne Schlagzahlen zählen für Siege und Platzierungen, aber nicht für Schlagdifferenzen.
 
+## Spieleinstellungen
+
+Meist die Standardeinstellungen ohne Power-ups:
+
+- Höchstens 12 Schläge und 120 Sekunden pro Loch. Wer eins davon überschreitet oder das Loch aufgibt, bekommt eine 14.
+- Kamerazeit meist 15 Sekunden, auf sehr langen Maps 25 bis 30.
+- Kollision je nach Runde: im 1-gegen-1 mit Max meist aus, ab drei Spielern meist an.
+
 ## Spieler
 
 | Name im Buch | Ingame |

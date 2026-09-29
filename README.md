@@ -21,7 +21,7 @@ Die Seite ist eine einzelne HTML-Datei ohne Build-Schritt und ohne Framework. Gi
 Runden werden meist über eine Claude-Session eingetragen: Screenshot und Infos zur Runde geben, die Session trägt ein und committet.
 
 - Screenshot nach `img/<map-name>.jpg`, bei einer weiteren Runde auf derselben Map `-2`, `-3` usw.
-- Das Datum ist der Tag, an dem gespielt wurde, nicht der Tag des Eintragens.
+- Das Datum ist der Tag, an dem gespielt wurde, nicht der Tag des Eintragens. Auf dem Screenshot steht kein Datum, deshalb der Session den Spieltag immer dazusagen, sonst muss sie raten.
 - Vor dem Commit `python3 tools/check_data.py` laufen lassen. Die Prüfung läuft zusätzlich bei jedem Push als GitHub Action.
 
 ### Felder einer Runde

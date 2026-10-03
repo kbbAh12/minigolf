@@ -3736,7 +3736,7 @@
   },
   {
    "date": "2026-09-24",
-   "map": "Monkey Training Center",
+   "map": "Monkey Training Facility",
    "type": "community",
    "order": [
     [
@@ -3747,7 +3747,7 @@
      "Max"
     ]
    ],
-   "note": "Sehr viele Bugs. Je nach Auslegung lag ich vor oder hinter Max, deshalb als Unentschieden gewertet. Henry davor. Kein Screenshot. Map-Name nicht gesichert."
+   "note": "Sehr viele Bugs. Je nach Auslegung lag ich vor oder hinter Max, deshalb als Unentschieden gewertet. Henry davor. Kein Screenshot."
   },
   {
    "date": "2026-09-25",
@@ -4480,6 +4480,85 @@
     ]
    },
    "note": "Nur zu zweit. Zwei 14er bei mir (Loch 15 und 17) haben die Runde gekippt."
+  },
+  {
+   "date": "2026-10-02",
+   "map": "Monkey Training Facility",
+   "type": "community",
+   "shot": "monkey-training-facility",
+   "par": [
+    3,
+    3,
+    3,
+    3,
+    3,
+    4,
+    4,
+    3,
+    3,
+    3,
+    4,
+    4,
+    3,
+    3,
+    4,
+    3,
+    3,
+    1
+   ],
+   "scores": {
+    "Robin": [
+     1,
+     2,
+     4,
+     3,
+     3,
+     5,
+     2,
+     2,
+     3,
+     3,
+     5,
+     3,
+     3,
+     2,
+     2,
+     7,
+     2,
+     3
+    ],
+    "Ich": [
+     1,
+     2,
+     6,
+     3,
+     4,
+     3,
+     3,
+     2,
+     3,
+     2,
+     3,
+     4,
+     4,
+     4,
+     3,
+     5,
+     3,
+     2
+    ]
+   },
+   "note": "Zweite Runde auf dieser Map, nur zu zweit. Knapp mit zwei Schlägen verloren."
+  },
+  {
+   "date": "2026-10-02",
+   "map": "Cosy Caves",
+   "type": "community",
+   "totals": {
+    "Robin": 62,
+    "Ich": 63
+   },
+   "note": "Zweite Runde auf dieser Map, nur zu zweit. Kein Screenshot, nur Endstände. Knapp mit einem Schlag verloren."
   }
  ],
  "maps": {

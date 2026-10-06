@@ -48,8 +48,6 @@ Runden werden meist über eine Claude-Session eingetragen: Screenshot und Infos 
 
 Manchmal treten auf einem Loch aber Bugs auf. Dann hat ein Spieler mehr Schläge, als er ohne den Bug gebraucht hätte, oder er kann das Loch gar nicht weiterspielen und bekommt die 14. Ob und wie das korrigiert wird, entscheiden die Spieler der jeweiligen Runde. Eine Korrektur wird eingetragen, indem der Lochwert geändert wird oder, falls das Loch unklar ist, per `adjust`. In beiden Fällen steht in der Notiz, was geändert wurde und welche Werte der Screenshot zeigt.
 
-Ähnlich bei einer 14 aus Frust, wenn jemand ein Loch eigentlich hätte zu Ende spielen können: Sie kann mit 2 Schlägen über dem Schnitt der anderen Spieler auf diesem Loch gewertet werden (Beispiel: Vernübeltes Ägypten am 06.10.).
-
 ### Sonstiges
 
 - Wer während einer Runde rausfliegt, wird normalerweise nicht gewertet. Ausnahmen stehen in der Notiz.

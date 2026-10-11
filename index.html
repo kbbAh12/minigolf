@@ -125,6 +125,7 @@
   .duelsum { font-size:13px; color:var(--chalk-dim); margin:0 0 6px; }
   table.duel td:not(:first-child), table.duel th:not(:first-child) { width:28%; }
   td.pick { cursor:pointer; } td.pick:hover { background:var(--green-mid); }
+  tr.guest td { color:var(--chalk-dim); }
   .err { border:1px solid var(--brick); border-radius:3px; padding:12px 14px; color:var(--chalk); font-size:13px; }
 </style>
 </head>
@@ -322,7 +323,7 @@ function viewMatches() {
     const cells = playersOf(m).map(p => {
       const t = totalOf(m,p);
       return '<span class="' + (w.includes(p)?'win':'') + '">' + esc(p) + ' ' + (t==null?'–':t) + '</span>';
-    }).join(' · ');
+    }).join(' · ') + (m.guests ? ' <span class="muted">· +' + Object.keys(m.guests).length + ' Gäste</span>' : '');
     const short = m.note ? (m.note.length > 46 ? m.note.slice(0,44) + '…' : m.note) : '';
     return head + '<tr><td><button class="maplink" data-map="' + esc(m.map) + '">' + esc(m.map) + '</button>' +
       (short ? '<div class="note">' + esc(short) + '</div>' : '') + '</td>' +
@@ -518,7 +519,9 @@ function viewMapDetail(name) {
       const parRow = m.par.map(v => '<td class="muted">'+v+'</td>').join('');
       const body = Object.keys(m.scores).map(p => '<tr'+(p===ME?' class="me"':'')+'><td>'+esc(p)+'</td>' +
         m.scores[p].map((v,i) => '<td class="'+(v<m.par[i]?'win':v>m.par[i]?'loss':'')+'">'+v+'</td>').join('') +
-        '<td><strong>'+totalOf(m,p)+'</strong>'+(adjOf(m,p)?' <span class="muted">('+fmtInt(adjOf(m,p))+')</span>':'')+'</td></tr>').join('');
+        '<td><strong>'+totalOf(m,p)+'</strong>'+(adjOf(m,p)?' <span class="muted">('+fmtInt(adjOf(m,p))+')</span>':'')+'</td></tr>').join('') +
+        Object.entries(m.guests || {}).map(([g,sc]) => '<tr class="guest"><td>'+esc(g)+' <span class="ro">Gast</span></td>' +
+          sc.map(v => '<td>'+v+'</td>').join('') + '<td>'+sum(sc)+'</td></tr>').join('');
       out += '<h3>Loch für Loch · '+dayLabel(m.date)+'</h3><div class="scroll flush"><table class="holes"><thead><tr><th>Loch</th>'+head+'<th>Ges</th></tr></thead><tbody><tr><td class="muted">Par</td>'+parRow+'<td class="muted">'+sum(m.par)+'</td></tr>'+body+'</tbody></table></div>';
     }
     if (m.par && m.scores && Object.keys(m.scores).length > 1)

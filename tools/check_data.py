@@ -71,6 +71,9 @@ for i, m in enumerate(matches):
                 err(f'{where}: {p} hat {len(s)} Lochwerte, Par hat {len(par)}')
             if any(not isinstance(x, int) or x < 0 for x in s):
                 err(f'{where}: {p} hat ungültige Lochwerte')
+        for g, s in (m.get('guests') or {}).items():
+            if len(s) != len(par):
+                err(f'{where}: Gast {g} hat {len(s)} Lochwerte, Par hat {len(par)}')
 
     named = set(scores) | set(m.get('totals') or {}) | set(m.get('adjust') or {})
     for group in m.get('order') or []:

@@ -496,19 +496,29 @@ function viewMapDetail(name) {
   const type = (rs[0] && rs[0].type) || info.type || 'community';
   const pt = rs.length ? parTotal(rs[0]) : null;
   const ps = [...new Set(rs.flatMap(playersOf))];
+  // Maps können Updates bekommen; jede Runde trägt ihre Version (Standard 1) und ihr eigenes Par
+  const versionOf = m => m.version || 1;
+  const versions = [...new Set(rs.map(versionOf))].sort((a,b) => a-b);
+  const multi = versions.length > 1;
+  const vTag = m => multi ? ' · Version ' + versionOf(m) : '';
+  const parInfo = multi
+    ? versions.map(v => { const r = rs.find(m => versionOf(m) === v); const t = parTotal(r); return 'Version '+v+(t!=null?' Par '+t:''); }).join(', ')
+    : (pt!=null ? 'Par '+pt : '');
 
   const rows = ps.map(p => {
     const mine = rs.filter(m => playersOf(m).includes(p));
     const totals = mine.map(m => totalOf(m,p)).filter(t => t != null);
     const sts = mine.map(m => holeStats(m,p)).filter(Boolean);
     const best = totals.length ? Math.min(...totals) : null;
+    const toPars = mine.map(m => { const t = totalOf(m,p), q = parTotal(m); return t != null && q != null ? t - q : null; }).filter(v => v != null);
+    const bestToPar = toPars.length ? Math.min(...toPars) : null;
     const avg = totals.length ? sum(totals)/totals.length : null;
     const avgSd = sts.length ? sum(sts.map(s => s.sd))/sts.length : null;
     const worst = sts.length ? Math.max(...sts.map(s => s.worst)) : null;
     const wins = mine.filter(m => winnersOf(m).includes(p)).length;
     return '<tr'+(p===ME?' class="me"':'')+'><td>'+esc(p)+'</td><td>'+mine.length+'</td><td>'+wins+'</td>' +
       '<td>'+(best==null?'–':best)+'</td><td>'+(avg==null?'–':avg.toFixed(1))+'</td>' +
-      '<td>'+(best!=null&&pt!=null?fmtInt(best-pt):'–')+'</td>' +
+      '<td>'+(bestToPar==null?'–':fmtInt(bestToPar))+'</td>' +
       '<td>'+(avgSd==null?'–':avgSd.toFixed(2))+'</td><td>'+(worst==null?'–':fmtInt(worst))+'</td></tr>';
   }).join('');
 
@@ -522,12 +532,12 @@ function viewMapDetail(name) {
         '<td><strong>'+totalOf(m,p)+'</strong>'+(adjOf(m,p)?' <span class="muted">('+fmtInt(adjOf(m,p))+')</span>':'')+'</td></tr>').join('') +
         Object.entries(m.guests || {}).map(([g,sc]) => '<tr class="guest"><td>'+esc(g)+' <span class="ro">Gast</span></td>' +
           sc.map(v => '<td>'+v+'</td>').join('') + '<td>'+sum(sc)+'</td></tr>').join('');
-      out += '<h3>Loch für Loch · '+dayLabel(m.date)+'</h3><div class="scroll flush"><table class="holes"><thead><tr><th>Loch</th>'+head+'<th>Ges</th></tr></thead><tbody><tr><td class="muted">Par</td>'+parRow+'<td class="muted">'+sum(m.par)+'</td></tr>'+body+'</tbody></table></div>';
+      out += '<h3>Loch für Loch · '+dayLabel(m.date)+vTag(m)+'</h3><div class="scroll flush"><table class="holes"><thead><tr><th>Loch</th>'+head+'<th>Ges</th></tr></thead><tbody><tr><td class="muted">Par</td>'+parRow+'<td class="muted">'+sum(m.par)+'</td></tr>'+body+'</tbody></table></div>';
     }
     if (m.par && m.scores && Object.keys(m.scores).length > 1)
       out += '<p class="charttitle">Verlauf · Schläge hinter dem Führenden nach jedem Loch</p>' + progressChart(m);
     if (m.note) out += '<p class="note">'+esc(m.note)+'</p>';
-    if (m.shot) out += '<figure><img loading="lazy" src="img/'+esc(m.shot)+'.jpg" alt="Bestenliste '+esc(name)+'" onerror="this.closest(\'figure\').remove()"><figcaption>Bestenliste im Spiel, '+dayLabel(m.date)+'</figcaption></figure>';
+    if (m.shot) out += '<figure><img loading="lazy" src="img/'+esc(m.shot)+'.jpg" alt="Bestenliste '+esc(name)+'" onerror="this.closest(\'figure\').remove()"><figcaption>Bestenliste im Spiel, '+dayLabel(m.date)+vTag(m)+'</figcaption></figure>';
     return out;
   }).join('');
 
@@ -538,7 +548,7 @@ function viewMapDetail(name) {
 
   return '<button class="back" id="m-back">← Alle Maps</button>' +
     '<h2 style="margin-top:0">'+esc(name)+'</h2>' +
-    '<p class="sub">'+type+(pt!=null?' · Par '+pt:'')+' · '+rs.length+' Runde'+(rs.length===1?'':'n')+'</p>' +
+    '<p class="sub">'+type+(parInfo?' · '+parInfo:'')+' · '+rs.length+' Runde'+(rs.length===1?'':'n')+'</p>' +
     (info.note ? '<p class="note">'+esc(info.note)+'</p>' : '') +
     '<p class="grade">Bewertungen — '+gradeList+'</p>' +
     (ps.length ? '<h3>Spielerwerte auf dieser Map</h3><div class="scroll"><table><thead><tr><th>Spieler</th><th>Runden</th><th>Siege</th><th>Best</th><th>Ø</th><th>Best zu Par</th><th>Ø Streuung</th><th>schlecht. Loch</th></tr></thead><tbody>'+rows+'</tbody></table></div>' : '<p class="empty">Noch nicht gespielt.</p>') +

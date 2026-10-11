@@ -89,6 +89,9 @@ for i, m in enumerate(matches):
         if p not in in_match:
             err(f'{where}: "adjust" für {p!r}, der in der Runde nicht vorkommt')
 
+    if 'version' in m and (not isinstance(m['version'], int) or m['version'] < 1):
+        err(f'{where}: "version" muss eine ganze Zahl ab 1 sein')
+
     shot = m.get('shot')
     if shot:
         if shot not in images:

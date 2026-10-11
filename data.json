@@ -6647,7 +6647,8 @@
     "Ich": 88,
     "Robin": 95.5
    },
-   "note": "Zweite Runde auf dieser Map, Par inzwischen 79 statt 75 (Löcher 4, 5, 9 und 11 je +1). Ich hatte Verbindungsprobleme: nach Loch 10 stand ich bei 54, Loch 11 bis 18 habe ich danach allein nachgespielt (34). Der Screenshot zeigt diese Nachspiel-Runde, die ersten 10 Löcher darauf sind ungültig. Robin hatte 94 oder 97, gewertet mit dem Schnitt 95,5."
+   "note": "Zweite Runde auf dieser Map, Map-Update seit dem 09.10.: Par 79 statt 75 (Löcher 4, 5, 9 und 11 je +1), deshalb Version 2. Ich hatte Verbindungsprobleme: nach Loch 10 stand ich bei 54, Loch 11 bis 18 habe ich danach allein nachgespielt (34). Der Screenshot zeigt diese Nachspiel-Runde, die ersten 10 Löcher darauf sind ungültig. Robin hatte 94 oder 97, gewertet mit dem Schnitt 95,5.",
+   "version": 2
   },
   {
    "date": "2026-10-11",

@@ -39,6 +39,7 @@ Runden werden meist über eine Claude-Session eingetragen: Screenshot und Infos 
 | `order` | Platzierung, wenn gar keine Zahlen da sind. Gleichstand als gemeinsame Gruppe, z. B. `[["Max"], ["Ich", "Henry"]]` |
 | `adjust` | Korrektur auf den Gesamtwert, z. B. `{"Max": -3}`, wenn unklar ist, auf welchem Loch sie anfällt |
 | `guests` | Lochwerte fremder Mitspieler. Sie stehen nur in der Lochtabelle der Runde und zählen in keiner Wertung. Spielt jemand öfter mit, wandert er nach `scores` und in `players`. |
+| `version` | Map-Version, falls eine Map ein Update bekommen hat (z. B. anderes Par). Fehlt das Feld, gilt Version 1. „Zu Par“ wird immer mit dem Par der jeweiligen Runde gerechnet. |
 | `note` | Freitext, v. a. für Korrekturen und Besonderheiten |
 
 ## Wertung

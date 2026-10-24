@@ -68,7 +68,7 @@ Meist die Standardeinstellungen ohne Power-ups:
 | Name im Buch | Ingame |
 |---|---|
 | Ich | kbb[AH] |
-| Max | Füsikalex (bis Oktober 2026 Diktator Mbappe) |
+| Max | Diktator Mbappe (im Oktober 2026 kurz Füsikalex) |
 | Henry | Jakob Schwarz |
 | Florian | spUUkz |
 | Robin | Jaray4r |
